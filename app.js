@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v10';
+const BUILD = 'v11';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -56,7 +56,7 @@ const T = {
     storage_full: 'Память заполнена. Удали лишние фото из заметок.',
     auto_start: 'Автозапуск в (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
     auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если время прошло больше двух часов назад, задача останется обычной.',
-    reorder: 'Порядок', up: 'Выше', down: 'Ниже',
+    reorder: 'Порядок', up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
   },
   en: {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
@@ -96,7 +96,7 @@ const T = {
     storage_full: 'Storage is full. Remove some photos from notes.',
     auto_start: 'Auto-start at (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
     auto_hint: 'The task starts by itself at the set time when the app is open. If that time was more than two hours ago, it stays a normal task.',
-    reorder: 'Order', up: 'Up', down: 'Down',
+    reorder: 'Order', up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
   },
 };
 
@@ -603,6 +603,144 @@ function viewSettings() {
 
 const NOTE_ICONS = ['note', 'note2', 'filetext', 'image', 'pin', 'list', 'clipboard', 'palette', 'star', 'heart', 'book', 'briefcase', 'code', 'music', 'cart', 'home'];
 
+// ---- Подсветка синтаксиса ----
+const LANGS = {
+  js: { title: 'JavaScript', line: '//', block: ['/*', '*/'], quotes: '\'"`', kw: 'const let var function return if else for while do break continue new class extends super this typeof instanceof in of try catch finally throw async await yield import export from default delete void switch case static get set null undefined', boo: 'true false null undefined NaN Infinity' },
+  ts: { title: 'TypeScript', line: '//', block: ['/*', '*/'], quotes: '\'"`', kw: 'const let var function return if else for while do break continue new class extends implements interface type enum super this typeof instanceof in of try catch finally throw async await yield import export from default delete void switch case static get set public private protected readonly namespace declare abstract as satisfies null undefined', boo: 'true false null undefined' },
+  python: { title: 'Python', line: '#', block: null, quotes: '\'"', kw: 'def return if elif else for while break continue class import from as try except finally raise with lambda pass global nonlocal assert yield async await del in is not and or None self True False', boo: 'True False None' },
+  sql: { title: 'SQL', line: '--', block: ['/*', '*/'], quotes: '\'"`', kw: 'select insert update delete create alter drop table from where join left right inner outer on group by order having limit offset values into set and or not null is as distinct count sum avg min max union all case when then end primary key foreign references index unique default check constraint', boo: 'null true false' },
+  bash: { title: 'Shell', line: '#', block: null, quotes: '\'"', kw: 'if then else fi for while do done case esac function return export local read echo cd ls mkdir rm cp mv cat grep sed awk curl wget git npm sudo apt docker chmod chown tar ssh scp kill ps touch find xargs which source exit set unset', boo: 'true false' },
+  clike: { title: 'C / Java', line: '//', block: ['/*', '*/'], quotes: '\'"', kw: 'int long short char float double void bool boolean string struct class public private protected static final const new return if else for while do break continue switch case default try catch finally throw throws import package using namespace include define typedef unsigned signed true false null nullptr this super extends implements interface enum var let function print println printf System', boo: 'true false null' },
+  css: { title: 'CSS', line: null, block: ['/*', '*/'], quotes: '\'"', kw: 'important media supports keyframes import charset from to and not', boo: '' },
+  html: { title: 'HTML', line: null, block: ['<!--', '-->'], quotes: '\'"', kw: '', boo: '' },
+  json: { title: 'JSON', line: null, block: null, quotes: '"', kw: '', boo: 'true false null' },
+  php: { title: 'PHP', line: '//', block: ['/*', '*/'], quotes: '\'"', kw: 'function return if else elseif for foreach while do break continue class extends implements public private protected static new echo print try catch finally throw use namespace require include array null true false this self', boo: 'true false null' },
+};
+const LANG_ORDER = ['js', 'ts', 'python', 'html', 'css', 'json', 'sql', 'bash', 'clike', 'php'];
+function detectLang(src) {
+  const s = String(src || '').trim();
+  if (!s) return '';
+  if (/^<\?php/.test(s)) return 'php';
+  if (/^<!doctype|<html[\s>]|<\/(div|span|body|head|p|ul|li|a|table|h[1-6])>/i.test(s)) return 'html';
+  if (/^[{[]/.test(s)) { try { JSON.parse(s); return 'json'; } catch (e) { /* не JSON */ } }
+  if (/^\s*(select|insert|update|delete|create|alter|drop)\b[\s\S]*\b(from|into|table|set|where|values)\b/i.test(s)) return 'sql';
+  if (/^#!|^\s*(sudo|apt|apt-get|brew|npm|yarn|pnpm|git|cd|ls|mkdir|curl|wget|docker|pip|python3?)\s+[-\w./]/m.test(s)) return 'bash';
+  if (/\b(def|elif|lambda|self)\b|^\s*from\s+\w+\s+import\s/m.test(s)) return 'python';
+  if (/^\s*[.#@]?[A-Za-z][\w-]*[^{}]*\{[^}]*[\w-]+\s*:\s*[^;}]+;/m.test(s)) return 'css';
+  if (/\b(interface|type|enum)\s+\w+\s*[={]|:\s*(string|number|boolean|any)\b|\breadonly\b|\bsatisfies\b/.test(s)) return 'ts';
+  if (/\b(const|let|var|function|=>|import|export|class|async|await|console\.log)\b/.test(s)) return 'js';
+  if (/#include|using namespace|public\s+(static\s+)?(void|class)|System\.out|fmt\./.test(s)) return 'clike';
+  if (/[{};]$|\)\s*{$/.test(s)) return 'clike';
+  return '';
+}
+function highlightCode(src, lang) {
+  const L = LANGS[lang];
+  const escH = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  if (!L) return escH(src);
+  if (lang === 'html') return highlightHtml(src);
+  const kw = new Set(L.kw.split(/\s+/).filter(Boolean));
+  const boo = new Set((L.boo || '').split(/\s+/).filter(Boolean));
+  const out = [];
+  const push = (cls, text) => out.push(cls ? `<span class="tok-${cls}">${escH(text)}</span>` : escH(text));
+  const n = src.length;
+  let i = 0;
+  while (i < n) {
+    if (L.line && src.startsWith(L.line, i)) {
+      let j = src.indexOf('\n', i);
+      if (j < 0) j = n;
+      push('com', src.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (L.block && src.startsWith(L.block[0], i)) {
+      let j = src.indexOf(L.block[1], i + L.block[0].length);
+      j = j < 0 ? n : j + L.block[1].length;
+      push('com', src.slice(i, j));
+      i = j;
+      continue;
+    }
+    const c = src[i];
+    if (L.quotes.includes(c)) {
+      const triple = (c === '"' || c === "'") && src.startsWith(c + c + c, i);
+      const q = triple ? c + c + c : c;
+      let j = i + q.length;
+      while (j < n) {
+        if (src[j] === '\\') { j += 2; continue; }
+        if (src.startsWith(q, j)) { j += q.length; break; }
+        if (!triple && src[j] === '\n') break;
+        j++;
+      }
+      j = Math.min(j, n);
+      const tail = src.slice(j, j + 30);
+      const isKey = lang === 'json' && /^\s*:/.test(tail);
+      push(isKey ? 'key' : 'str', src.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (/[0-9]/.test(c) && !/[\w$]/.test(src[i - 1] || '')) {
+      let j = i;
+      while (j < n && /[0-9a-fA-FxXoObB._]/.test(src[j])) j++;
+      push('num', src.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_$@#]/.test(c)) {
+      let j = i;
+      while (j < n && /[\w$-]/.test(src[j])) j++;
+      const w = src.slice(i, j);
+      if (kw.has(w)) push('kw', w);
+      else if (boo.has(w)) push('boo', w);
+      else if (/^[.#@]/.test(w)) push('kw', w);
+      else if (/^\s*\(/.test(src.slice(j))) push('fn', w);
+      else push(null, w);
+      i = j;
+      continue;
+    }
+    push(null, c);
+    i++;
+  }
+  return out.join('');
+}
+function highlightHtml(src) {
+  const escH = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const lt = src.indexOf('<', i);
+    if (lt < 0) { out += escH(src.slice(i)); break; }
+    out += escH(src.slice(i, lt));
+    if (src.startsWith('<!--', lt)) {
+      let j = src.indexOf('-->', lt);
+      j = j < 0 ? n : j + 3;
+      out += `<span class="tok-com">${escH(src.slice(lt, j))}</span>`;
+      i = j;
+      continue;
+    }
+    const gt = src.indexOf('>', lt);
+    if (gt < 0) { out += escH(src.slice(lt)); break; }
+    const tag = src.slice(lt, gt + 1);
+    const m = tag.match(/^<(\/?)([\w-]+)/);
+    if (!m) { out += escH(tag); i = gt + 1; continue; }
+    out += `<span class="tok-tag">${escH('<' + m[1] + m[2])}</span>`;
+    let rest = tag.slice(1 + m[1].length + m[2].length);
+    const close = rest.match(/(\/?)>$/);
+    if (close) rest = rest.slice(0, rest.length - close[0].length);
+    const re = /([\w:-]+)(\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)?|(\s+)|([^\s]+)/g;
+    let mm;
+    while ((mm = re.exec(rest))) {
+      if (mm[1]) {
+        out += `<span class="tok-attr">${escH(mm[1])}</span>${escH(mm[2] || '')}`;
+        if (mm[3]) out += `<span class="tok-str">${escH(mm[3])}</span>`;
+      } else if (mm[4]) out += escH(mm[4]);
+      else out += escH(mm[5]);
+    }
+    out += escH(close ? close[0] : '>');
+    i = gt + 1;
+  }
+  return out;
+}
+
 function notePreview(n) {
   const b = (n.blocks || []).find((x) => (x.type === 'text' || x.type === 'code') && x.text && x.text.trim());
   if (b) return b.text.trim().replace(/\s+/g, ' ').slice(0, 90);
@@ -657,8 +795,14 @@ function noteBlock(b, i, total) {
   if (b.type === 'photo') {
     body = `<img class="note-photo" src="${esc(b.src)}" alt="">`;
   } else if (b.type === 'code') {
-    body = `<input data-lang="${b.id}" value="${esc(b.lang || '')}" placeholder="${t('note_code_lang')}" maxlength="20">
-      <textarea class="code" data-block="${b.id}" rows="4" spellcheck="false" placeholder="${t('note_add_code')}">${esc(b.text || '')}</textarea>`;
+    const detected = b.lang ? '' : detectLang(b.text || '');
+    const label = b.lang ? b.lang : (detected ? `${detected} · ${t('auto')}` : t('auto'));
+    body = `<input data-lang="${b.id}" value="${esc(b.lang || '')}" placeholder="${t('note_code_lang')}" maxlength="20" list="langList">
+      <div class="code-wrap">
+        <pre class="code-view" data-code-view="${b.id}" aria-hidden="true">${highlightCode(b.text || '', b.lang || detected || 'js')}</pre>
+        <textarea class="code" data-block="${b.id}" rows="4" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="${t('note_add_code')}">${esc(b.text || '')}</textarea>
+      </div>
+      <small class="muted">${t('note_lang')}: ${esc(label)}</small>`;
   } else {
     body = `<textarea data-block="${b.id}" rows="3" placeholder="${t('note_add_text')}">${esc(b.text || '')}</textarea>`;
   }
@@ -694,6 +838,7 @@ function viewNoteEditor() {
       <button data-act="noteAdd" data-type="code">${icon('code')} ${t('note_add_code')}</button>
     </div>
     <p class="muted">${t('note_blocks_hint')}</p>
+    <datalist id="langList">${LANG_ORDER.map((k) => `<option value="${k}">${LANGS[k].title}</option>`).join('')}</datalist>
     <input type="file" id="notePhoto" accept="image/*" multiple hidden data-change="notePhoto">`;
 }
 function viewNotes() {
@@ -1077,10 +1222,14 @@ document.addEventListener('input', (e) => {
   let handled = false;
   if (el.dataset.block) {
     const b = n.blocks.find((x) => x.id === el.dataset.block);
-    if (b) { b.text = el.value; handled = true; }
+    if (b) {
+      b.text = el.value;
+      handled = true;
+      if (b.type === 'code') refreshCodeView(b);
+    }
   } else if (el.dataset.lang) {
     const b = n.blocks.find((x) => x.id === el.dataset.lang);
-    if (b) { b.lang = el.value; handled = true; }
+    if (b) { b.lang = el.value.trim(); handled = true; refreshCodeView(b); }
   } else if (el.hasAttribute('data-note-title')) {
     n.title = el.value;
     handled = true;
@@ -1091,6 +1240,27 @@ document.addEventListener('input', (e) => {
   const upd = $('#noteUpdated');
   if (upd) upd.textContent = `${t('note_updated')}: ${fmtDateTime(n.updatedAt)}`;
 });
+// Перерисовывает подсветку кода и подпись языка для одного блока.
+function refreshCodeView(b) {
+  const detected = b.lang ? '' : detectLang(b.text || '');
+  const lang = b.lang || detected || 'js';
+  const pre = document.querySelector(`[data-code-view="${b.id}"]`);
+  if (pre) {
+    pre.innerHTML = highlightCode(b.text || '', lang);
+    const ta = document.querySelector(`[data-block="${b.id}"]`);
+    if (ta) pre.scrollTop = ta.scrollTop;
+  }
+  const block = pre ? pre.closest('.note-block') : null;
+  const lbl = block ? block.querySelector('small.muted') : null;
+  if (lbl) lbl.textContent = `${t('note_lang')}: ${b.lang || (detected ? `${detected} · ${t('auto')}` : t('auto'))}`;
+}
+// Прокрутка подсветки вслед за полем кода.
+document.addEventListener('scroll', (e) => {
+  const el = e.target;
+  if (!el || !el.dataset || !el.dataset.block) return;
+  const pre = document.querySelector(`[data-code-view="${el.dataset.block}"]`);
+  if (pre) pre.scrollTop = el.scrollTop;
+}, true);
 
 document.addEventListener('change', (e) => {
   const el = e.target;
