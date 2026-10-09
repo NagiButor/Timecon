@@ -527,7 +527,7 @@ let ver = 0;
 let dirty = localStorage.getItem('timecon.dirty') === '1' || !localStorage.getItem(SYNC_KEY);
 function setDirty(v) { dirty = v; localStorage.setItem('timecon.dirty', v ? '1' : '0'); }
 const cfg = window.TIMECON_SUPABASE || {};
-const sync = { user: null, client: null, updated: 0, timer: null, email: '', sent: false, msg: '' };
+const sync = { user: null, client: null, channel: null, updated: 0, timer: null, email: '', sent: false, msg: '' };
 try { sync.updated = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}').updated || 0; } catch (e) { /* пусто */ }
 
 function syncMeta(ts) { sync.updated = ts; localStorage.setItem(SYNC_KEY, JSON.stringify({ updated: ts })); }
@@ -605,15 +605,41 @@ function failSync() {
 function pullSafe() {
   syncCycle().catch(failSync);
 }
+// Мгновенное получение изменений с других устройств через Realtime.
+function onRemote(payload) {
+  const row = payload.new;
+  if (!row || !row.updated_at) return;
+  if (Number(row.updated_at) === sync.updated) return; // это отражение нашей же записи
+  if (dirty) { pullSafe(); return; } // есть локальные правки — объединим на сервере
+  S = { ...defaults(), ...row.data };
+  save();
+  syncMeta(Number(row.updated_at));
+  render();
+}
+function watchRealtime() {
+  const c = sbc();
+  if (!c || !sync.user || sync.channel) return;
+  sync.channel = c
+    .channel(`timecon-${sync.user.id}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'timecon_state', filter: `user_id=eq.${sync.user.id}` }, onRemote)
+    .subscribe();
+}
+function stopRealtime() {
+  if (!sync.channel) return;
+  sbc().removeChannel(sync.channel);
+  sync.channel = null;
+}
 function syncInit() {
   const c = sbc();
   if (!c) return;
   c.auth.onAuthStateChange((_e, session) => {
     sync.user = session ? session.user : null;
-    if (sync.user) pullSafe();
-    else render();
+    if (sync.user) { pullSafe(); watchRealtime(); }
+    else { stopRealtime(); render(); }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
+  window.addEventListener('focus', () => { if (sync.user) pullSafe(); });
+  // Резервная синхронизация, если Realtime-канал отключился.
   setInterval(() => { if (sync.user && !document.hidden) pullSafe(); }, 15000);
 }
 async function syncAuth(mode, email, password) {
@@ -679,7 +705,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'syncNow': syncCycle().catch(failSync); return;
-    case 'syncOut': sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
+    case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
     case 'export': exportJSON(); return;
     case 'exportCsv': exportCSV(); return;
     default: return;
