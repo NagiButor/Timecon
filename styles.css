@@ -1,25 +1,29 @@
 :root {
-  --bg: #17130c;
-  --card: #221c11;
-  --card2: #2d2517;
-  --text: #f0e6d2;
-  --muted: #a3936e;
+  --bg: #121214;
+  --card: #1a1a1d;
+  --card2: #232327;
+  --text: #e9e9ec;
+  --muted: #8b8b93;
   --accent: #d4af37;
-  --ok: #a7c957;
-  --bad: #e2683c;
-  --border: #3b3220;
+  --ok: #8fbf5a;
+  --bad: #d95f43;
+  --border: #2c2c31;
 }
 [data-theme="light"] {
-  --bg: #f6f1e4;
-  --card: #fffdf7;
-  --card2: #efe7d3;
-  --text: #2b2416;
-  --muted: #7d6f4e;
+  --bg: #f2f2f3;
+  --card: #ffffff;
+  --card2: #e9e9eb;
+  --text: #1c1c1f;
+  --muted: #6c6c74;
   --accent: #a9803a;
-  --ok: #5c8a2b;
-  --bad: #c05226;
-  --border: #e2d8bf;
+  --ok: #4e7d22;
+  --bad: #b04a25;
+  --border: #dcdce0;
 }
+html { accent-color: var(--accent); }
+::placeholder { color: var(--muted); opacity: 1; }
+input:focus, select:focus { border-color: var(--accent); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -83,7 +87,7 @@ label.check input { width: auto; }
 .mark.bad { color: var(--bad); }
 .mark .ic { width: 24px; height: 24px; }
 .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.clock { display: block; font-size: 34px; font-variant-numeric: tabular-nums; text-align: center; margin-top: 8px; color: var(--accent); }
+.clock { display: block; font-size: 34px; font-variant-numeric: tabular-nums; text-align: center; margin-top: 8px; color: var(--text); }
 .verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .verdict span { width: 100%; color: var(--muted); }
 .move { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 8px; }

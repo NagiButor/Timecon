@@ -110,9 +110,15 @@ function defaults() {
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...defaults(), ...JSON.parse(raw) };
+    if (raw) return migrate({ ...defaults(), ...JSON.parse(raw) });
   } catch (e) { /* повреждённые данные — начинаем заново */ }
   return defaults();
+}
+// Старые стандартные цвета категорий приводим к тёплой палитре.
+const OLD_COLORS = { '#9ece6a': '#d4af37', '#7aa2f7': '#e0a458', '#e0af68': '#c2a878', '#bb9af7': '#b08968', '#73daca': '#9caf88' };
+function migrate(st) {
+  (st.cats || []).forEach((c) => { if (OLD_COLORS[c.color]) c.color = OLD_COLORS[c.color]; });
+  return st;
 }
 let S = load();
 const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null };
@@ -584,11 +590,11 @@ async function syncCycle() {
     await uploadNow();
   } else if (Number(data.updated_at) !== sync.updated) {
     if (dirty) {
-      S = mergeState(S, data.data);
+      S = migrate(mergeState(S, data.data));
       save();
       await uploadNow();
     } else {
-      S = { ...defaults(), ...data.data };
+      S = migrate({ ...defaults(), ...data.data });
       save();
       syncMeta(Number(data.updated_at));
     }
@@ -611,7 +617,7 @@ function onRemote(payload) {
   if (!row || !row.updated_at) return;
   if (Number(row.updated_at) === sync.updated) return; // это отражение нашей же записи
   if (dirty) { pullSafe(); return; } // есть локальные правки — объединим на сервере
-  S = { ...defaults(), ...row.data };
+  S = migrate({ ...defaults(), ...row.data });
   save();
   syncMeta(Number(row.updated_at));
   render();
