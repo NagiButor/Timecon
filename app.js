@@ -37,10 +37,11 @@ const T = {
     categories: 'Категории задач', fin_categories: 'Категории расходов', add_cat: 'Добавить категорию', name: 'Название', data: 'Данные',
     export_json: 'Экспорт JSON (бэкап)', import_json: 'Импорт JSON', export_csv: 'Экспорт CSV',
     sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни app/config.js (см. README.md).',
-    sync_in: 'Вход выполнен', sync_email: 'Почта', sync_send: 'Получить код', sync_code: 'Код из письма', sync_verify: 'Войти',
-    sync_sent: 'Код отправлен на почту. Введи его ниже.', sync_fail: 'Ошибка синхронизации. Проверь интернет.', sync_bad_code: 'Неверный код',
+    sync_in: 'Вход выполнен', sync_email: 'Почта', sync_send: 'Отправить ссылку для входа',
+    sync_link_sent: 'Ссылка для входа отправлена на', sync_again: 'Отправить ещё раз',
+    sync_fail: 'Ошибка синхронизации. Проверь интернет.',
     sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти',
-    sync_hint: 'При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
+    sync_hint: 'Открой ссылку из письма на том устройстве, где хочешь войти. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
     d: 'д', h: 'ч',
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
     cat_sport: 'Спорт', cat_work: 'Работа', cat_rest: 'Отдых', cat_study: 'Учёба', cat_home: 'Дом',
@@ -581,16 +582,11 @@ function syncInit() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
 }
 async function syncSend(email) {
-  const { error } = await sbc().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const redirect = location.href.split('#')[0].split('?')[0];
+  const { error } = await sbc().auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: redirect } });
   sync.email = email;
   sync.sent = !error;
-  sync.msg = error ? 'sync_fail' : 'sync_sent';
-  render();
-}
-async function syncVerify(code) {
-  const { error } = await sbc().auth.verifyOtp({ email: sync.email, token: code, type: 'email' });
-  sync.msg = error ? 'sync_bad_code' : '';
-  if (!error) sync.sent = false;
+  sync.msg = error ? 'sync_fail' : '';
   render();
 }
 function viewSync() {
@@ -603,10 +599,8 @@ function viewSync() {
       <p class="muted">${t('sync_hint')}</p>
       <button class="primary">${t('sync_send')}</button></form>
     ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
-  return `<form class="form" data-form="syncVerify">
-      <input name="code" inputmode="numeric" autocomplete="one-time-code" required placeholder="${t('sync_code')}">
-      <button class="primary">${t('sync_verify')}</button></form>
-    <p class="muted">${t('sync_sent')}</p>
+  return `<p class="muted">${t('sync_link_sent')} ${esc(sync.email)}</p>
+    <div class="acts"><button class="ghost" data-act="syncReset">${t('sync_again')}</button></div>
     ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
 }
 
@@ -642,6 +636,7 @@ document.addEventListener('click', (e) => {
     }
     case 'syncNow': flushPush().then(render); return;
     case 'syncOut': sbc().auth.signOut(); sync.sent = false; return;
+    case 'syncReset': sync.sent = false; sync.msg = ''; render(); return;
     case 'export': exportJSON(); return;
     case 'exportCsv': exportCSV(); return;
     default: return;
@@ -699,11 +694,9 @@ document.addEventListener('submit', (e) => {
 
 document.addEventListener('submit', (e) => {
   const f = e.target;
-  if (!f.dataset.form || !f.dataset.form.startsWith('sync')) return;
+  if (f.dataset.form !== 'syncSend') return;
   e.preventDefault();
-  const fd = new FormData(f);
-  if (f.dataset.form === 'syncSend') syncSend(String(fd.get('email') || '').trim());
-  else syncVerify(String(fd.get('code') || '').trim());
+  syncSend(String(new FormData(f).get('email') || '').trim());
 });
 
 document.addEventListener('change', (e) => {
