@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v7';
+const BUILD = 'v8';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -523,11 +523,60 @@ function viewSettings() {
 const NAV = [['tasks', 'tasks'], ['stats', 'chart'], ['finance', 'wallet'], ['settings', 'gear']];
 const VIEWS = { tasks: viewTasks, stats: viewStats, finance: viewFinance, settings: viewSettings };
 
+let renderedView = null;
+function fieldKeys(root) {
+  const seen = new Map();
+  return [...root.querySelectorAll('input, select, textarea')].map((el) => {
+    const form = el.closest('form');
+    const base = (form ? form.dataset.form || 'f' : 'x') + '|' + (el.name || el.id || el.type);
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    return { el, key: base + '#' + n };
+  });
+}
+// Запоминаем введённое в поля, чтобы перерисовка от синхронизации не сбрасывала ввод.
+function captureFields() {
+  const root = $('#main');
+  if (!root || renderedView !== ui.view) return null;
+  const map = new Map();
+  fieldKeys(root).forEach(({ el, key }) => {
+    map.set(key, {
+      value: el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' ? null : el.value,
+      checked: el.checked,
+      focused: el === document.activeElement,
+      selStart: el.selectionStart,
+      selEnd: el.selectionEnd,
+    });
+  });
+  return map;
+}
+function restoreFields(snap) {
+  if (!snap) return;
+  const root = $('#main');
+  if (!root) return;
+  let focus = null;
+  fieldKeys(root).forEach(({ el, key }) => {
+    const d = snap.get(key);
+    if (!d) return;
+    if (d.value !== null) el.value = d.value;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = d.checked;
+    if (d.focused) focus = { el, s: d.selStart, e: d.selEnd };
+  });
+  if (focus) {
+    try {
+      focus.el.focus();
+      if (focus.s !== null && focus.e !== null && focus.el.setSelectionRange) focus.el.setSelectionRange(focus.s, focus.e);
+    } catch (e) { /* поле уже перерисовано */ }
+  }
+}
 function render() {
+  const snap = captureFields();
   document.documentElement.dataset.theme = S.theme;
   document.documentElement.lang = S.lang;
   $('#nav').innerHTML = NAV.map(([v, ic]) => `<button class="${ui.view === v ? 'on' : ''}" data-act="tab" data-v="${v}">${icon(ic)}<span>${t(v)}</span></button>`).join('');
   $('#main').innerHTML = VIEWS[ui.view]();
+  renderedView = ui.view;
+  restoreFields(snap);
 }
 
 const SYNC_KEY = 'timecon.sync';
@@ -588,6 +637,7 @@ async function syncCycle() {
   if (!sync.user) return;
   const { data, error } = await sbc().from('timecon_state').select('data, updated_at').eq('user_id', sync.user.id).maybeSingle();
   if (error) throw error;
+  let changed = false;
   if (!data) {
     await uploadNow();
   } else if (Number(data.updated_at) !== sync.updated) {
@@ -595,16 +645,18 @@ async function syncCycle() {
       S = migrate(mergeState(S, data.data));
       save();
       await uploadNow();
+      changed = true;
     } else {
       S = migrate({ ...defaults(), ...data.data });
       save();
       syncMeta(Number(data.updated_at));
+      changed = true;
     }
   } else if (dirty) {
     await uploadNow();
   }
-  sync.msg = '';
-  render();
+  if (sync.msg) { sync.msg = ''; changed = true; }
+  if (changed) render();
 }
 function failSync() {
   sync.msg = 'sync_fail';
