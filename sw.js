@@ -1,5 +1,5 @@
-const CACHE = 'timecon-v6';
-const ASSETS = ['./', 'index.html', 'styles.css', 'config.js', 'icons.js', 'app.js', 'manifest.webmanifest', 'icon.svg'];
+const CACHE = 'timecon-v7';
+const ASSETS = ['./', 'index.html', 'styles.css?v=7', 'config.js?v=7', 'icons.js?v=7', 'app.js?v=7', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
@@ -14,7 +14,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-store' })
       .then((r) => {
         const copy = r.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

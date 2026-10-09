@@ -1,4 +1,5 @@
 const KEY = 'timecon.v1';
+const BUILD = 'v7';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -505,6 +506,7 @@ function viewSettings() {
       <label class="check"><input type="checkbox" name="shift" ${S.fin.shiftWeekend ? 'checked' : ''}> ${t('shift_weekend')}</label>
       <button class="primary">${t('save')}</button>
     </form>
+    <p class="muted" style="text-align:center">Timecon ${BUILD}</p>
     <section class="card"><h3>${t('categories')}</h3>${catEditor('cats', S.cats, 'addCat')}</section>
     <section class="card"><h3>${t('fin_categories')}</h3>${catEditor('finCats', S.fin.cats, 'addFinCat')}</section>
     <section class="card">
