@@ -37,11 +37,12 @@ const T = {
     categories: 'Категории задач', fin_categories: 'Категории расходов', add_cat: 'Добавить категорию', name: 'Название', data: 'Данные',
     export_json: 'Экспорт JSON (бэкап)', import_json: 'Импорт JSON', export_csv: 'Экспорт CSV',
     sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни app/config.js (см. README.md).',
-    sync_in: 'Вход выполнен', sync_email: 'Почта', sync_send: 'Отправить ссылку для входа',
-    sync_link_sent: 'Ссылка для входа отправлена на', sync_again: 'Отправить ещё раз',
+    sync_in: 'Вход выполнен', sync_email: 'Почта', sync_password: 'Пароль (минимум 6 символов)',
+    sync_login: 'Войти', sync_signup: 'Регистрация',
+    sync_check_email: 'Аккаунт создан. Войди с этой почтой и паролем.',
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
     sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
-    sync_hint: 'Открой ссылку из письма на том устройстве, где хочешь войти. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
+    sync_hint: 'Один аккаунт на всех устройствах: введи на каждом ту же почту и пароль. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
     d: 'д', h: 'ч',
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
     cat_sport: 'Спорт', cat_work: 'Работа', cat_rest: 'Отдых', cat_study: 'Учёба', cat_home: 'Дом',
@@ -67,11 +68,12 @@ const T = {
     categories: 'Task categories', fin_categories: 'Expense categories', add_cat: 'Add category', name: 'Name', data: 'Data',
     export_json: 'Export JSON (backup)', import_json: 'Import JSON', export_csv: 'Export CSV',
     sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in app/config.js (see README.md).',
-    sync_in: 'Signed in', sync_email: 'Email', sync_send: 'Send sign-in link',
-    sync_link_sent: 'Sign-in link sent to', sync_again: 'Send again',
+    sync_in: 'Signed in', sync_email: 'Email', sync_password: 'Password (min 6 characters)',
+    sync_login: 'Sign in', sync_signup: 'Sign up',
+    sync_check_email: 'Account created. Sign in with this email and password.',
     sync_fail: 'Sync error. Check your connection.',
     sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
-    sync_hint: 'Open the link from the email on the device you want to sign in on. When signing in on a new device, server data replaces local data if the server already has data.',
+    sync_hint: 'One account for all devices: enter the same email and password on each. When signing in on a new device, server data replaces local data if the server already has data.',
     d: 'd', h: 'h',
     wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     cat_sport: 'Sport', cat_work: 'Work', cat_rest: 'Rest', cat_study: 'Study', cat_home: 'Home',
@@ -614,13 +616,20 @@ function syncInit() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
   setInterval(() => { if (sync.user && !document.hidden) pullSafe(); }, 15000);
 }
-async function syncSend(email) {
-  const redirect = location.href.split('#')[0].split('?')[0];
-  const { error } = await sbc().auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: redirect } });
-  sync.email = email;
-  sync.sent = !error;
-  sync.msg = error ? 'sync_fail' : '';
+async function syncAuth(mode, email, password) {
+  sync.msg = '';
+  sync.busy = true;
   render();
+  const c = sbc().auth;
+  const { data, error } = mode === 'up'
+    ? await c.signUp({ email, password })
+    : await c.signInWithPassword({ email, password });
+  sync.busy = false;
+  if (error) sync.msg = error.message;
+  else if (mode === 'up' && !data.session) sync.msg = 'sync_check_email';
+  else sync.user = data.session ? data.session.user : null;
+  render();
+  if (sync.user) pullSafe();
 }
 function viewSync() {
   if (!sbc()) return `<p class="muted">${t('sync_not_config')}</p>`;
@@ -628,14 +637,15 @@ function viewSync() {
     <p class="muted">${t('sync_last')}: ${sync.updated ? new Date(sync.updated).toLocaleString(locale()) : '—'}</p>
     <div class="acts"><button data-act="syncNow">${t('sync_now')}</button><button class="ghost" data-act="syncOut">${t('sync_out')}</button></div>
     ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
-  if (!sync.sent) return `<form class="form" data-form="syncSend">
-      <input name="email" type="email" required placeholder="${t('sync_email')}" value="${esc(sync.email)}">
+  return `<form class="form" data-form="syncAuth">
+      <input name="email" type="email" autocomplete="username" required placeholder="${t('sync_email')}">
+      <input name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="${t('sync_password')}">
       <p class="muted">${t('sync_hint')}</p>
-      <button class="primary">${t('sync_send')}</button></form>
-    ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
-  return `<p class="muted">${t('sync_link_sent')} ${esc(sync.email)}</p>
-    <div class="acts"><button class="ghost" data-act="syncReset">${t('sync_again')}</button></div>
-    ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
+      <div class="row2">
+        <button class="primary" name="mode" value="in" ${sync.busy ? 'disabled' : ''}>${t('sync_login')}</button>
+        <button name="mode" value="up" ${sync.busy ? 'disabled' : ''}>${t('sync_signup')}</button>
+      </div></form>
+    ${sync.msg ? `<p class="muted">${sync.msg === 'sync_check_email' ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
 }
 
 document.addEventListener('click', (e) => {
@@ -669,8 +679,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'syncNow': syncCycle().catch(failSync); return;
-    case 'syncOut': sbc().auth.signOut(); sync.sent = false; return;
-    case 'syncReset': sync.sent = false; sync.msg = ''; render(); return;
+    case 'syncOut': sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
     case 'export': exportJSON(); return;
     case 'exportCsv': exportCSV(); return;
     default: return;
@@ -728,9 +737,11 @@ document.addEventListener('submit', (e) => {
 
 document.addEventListener('submit', (e) => {
   const f = e.target;
-  if (f.dataset.form !== 'syncSend') return;
+  if (f.dataset.form !== 'syncAuth') return;
   e.preventDefault();
-  syncSend(String(new FormData(f).get('email') || '').trim());
+  const fd = new FormData(f);
+  const mode = e.submitter && e.submitter.value === 'up' ? 'up' : 'in';
+  syncAuth(mode, String(fd.get('email') || '').trim(), String(fd.get('password') || ''));
 });
 
 document.addEventListener('change', (e) => {
