@@ -1,0 +1,130 @@
+:root {
+  --bg: #1b1f2a;
+  --card: #242a38;
+  --card2: #2c3347;
+  --text: #e6e9f2;
+  --muted: #8b93a7;
+  --accent: #7aa2f7;
+  --ok: #9ece6a;
+  --bad: #f7768e;
+  --border: #343b50;
+}
+[data-theme="light"] {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --card2: #eef1f8;
+  --text: #1d2233;
+  --muted: #6b7389;
+  --accent: #3b6fd6;
+  --ok: #3f8f2a;
+  --bad: #d13c58;
+  --border: #dfe3ee;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+}
+.top { padding: calc(12px + env(safe-area-inset-top)) 16px 4px; max-width: 640px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0; }
+main { padding: 8px 12px; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+h3 { margin: 0 0 8px; font-size: 15px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+button {
+  font: inherit; color: var(--text); background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+button:disabled { opacity: .4; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.ghost { background: transparent; }
+button.ok { color: var(--ok); border-color: var(--ok); }
+button.bad { color: var(--bad); border-color: var(--bad); }
+button.icon-btn { padding: 6px; }
+.ic { width: 20px; height: 20px; flex: none; }
+input, select {
+  font: inherit; color: var(--text); background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; min-width: 0; width: 100%;
+}
+.form { display: flex; flex-direction: column; gap: 8px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+label.check { flex-direction: row; align-items: center; color: var(--text); }
+label.check input { width: auto; }
+.btn-like {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px;
+  background: var(--card2); border: 1px solid var(--border); color: var(--text); cursor: pointer;
+}
+.daybar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.daylabel { display: flex; flex-direction: column; text-align: center; }
+.daylabel small { color: var(--muted); }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.toolbar label { flex-direction: row; align-items: center; gap: 6px; }
+.toolbar select { width: auto; }
+.tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.task {
+  background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--c, var(--accent));
+  border-radius: 12px; padding: 10px;
+}
+.task-head { display: flex; align-items: center; gap: 10px; }
+.cat-ico { color: var(--c, var(--accent)); display: flex; }
+.task-title { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ttl { overflow-wrap: anywhere; }
+.task-title small { color: var(--muted); }
+.task.done { border-left-color: var(--ok); }
+.task.failed { border-left-color: var(--bad); }
+.task.done .ttl { text-decoration: line-through; color: var(--ok); }
+.task.failed .ttl { text-decoration: line-through; color: var(--bad); }
+.mark { display: flex; }
+.mark.ok { color: var(--ok); }
+.mark.bad { color: var(--bad); }
+.mark .ic { width: 24px; height: 24px; }
+.acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.clock { display: block; font-size: 34px; font-variant-numeric: tabular-nums; text-align: center; margin-top: 8px; color: var(--accent); }
+.verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.verdict span { width: 100%; color: var(--muted); }
+.move { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 8px; }
+.mini { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mini li { display: flex; align-items: center; gap: 8px; }
+.mini li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mini li small { color: var(--muted); white-space: nowrap; }
+.mini li b { white-space: nowrap; }
+.empty, .muted { color: var(--muted); text-align: center; margin: 8px 0; }
+.muted { text-align: left; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { background: var(--card2); border-radius: 12px; padding: 10px; }
+.tile small { color: var(--muted); display: block; }
+.tile b { font-size: 18px; }
+.pos { color: var(--ok); }
+.neg { color: var(--bad); }
+.tile .pos, .tile .neg { font-weight: 600; }
+.periods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.periods button { justify-content: center; padding: 8px 4px; }
+.periods button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.bar-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.bar-l { display: flex; align-items: center; gap: 6px; }
+.bar-l span { flex: 1; }
+.bar-l small { color: var(--muted); }
+.bar { height: 8px; background: var(--card2); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.ico {
+  position: relative; align-items: center; justify-content: center; background: var(--card2);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px; color: var(--text);
+}
+.ico input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ico:has(input:checked) { border-color: var(--accent); color: var(--accent); }
+.tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--card); border-top: 1px solid var(--border);
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar button {
+  flex-direction: column; background: none; border: 0; color: var(--muted); font-size: 12px;
+  justify-content: center; gap: 2px;
+}
+.tabbar button.on { color: var(--accent); }
+.daybar button.icon-btn { padding: 6px 10px; }

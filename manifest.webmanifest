@@ -1,0 +1,14 @@
+{
+  "name": "Timecon",
+  "short_name": "Timecon",
+  "description": "Планировщик дня с таймером, статистикой и финансами",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b1f2a",
+  "theme_color": "#1b1f2a",
+  "lang": "ru",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
