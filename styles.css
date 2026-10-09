@@ -47,17 +47,27 @@ html { accent-color: var(--accent); }
 input:focus, select:focus { border-color: var(--accent); }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 * { box-sizing: border-box; }
+html { height: 100%; }
 body {
   margin: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--text);
   font: 16px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
   -webkit-tap-highlight-color: transparent;
 }
-.top { padding: calc(12px + env(safe-area-inset-top)) 16px 4px; max-width: 640px; margin: 0 auto; }
+.top { flex: none; padding: calc(12px + env(safe-area-inset-top)) 16px 4px; max-width: 640px; margin: 0 auto; width: 100%; }
 h1 { font-size: 20px; margin: 0; }
-main { padding: 8px 12px; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+main {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  padding: 8px 12px 20px; width: 100%; max-width: 640px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
 h3 { margin: 0 0 8px; font-size: 15px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
 button {
@@ -144,7 +154,7 @@ label.check input { width: auto; }
 .ico input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .ico:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, 1fr);
+  flex: none; z-index: 10; display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--card); border-top: 1px solid var(--border);
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
 }
