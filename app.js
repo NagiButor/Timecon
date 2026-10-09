@@ -40,7 +40,7 @@ const T = {
     sync_in: 'Вход выполнен', sync_email: 'Почта', sync_send: 'Отправить ссылку для входа',
     sync_link_sent: 'Ссылка для входа отправлена на', sync_again: 'Отправить ещё раз',
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
-    sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти',
+    sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
     sync_hint: 'Открой ссылку из письма на том устройстве, где хочешь войти. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
     d: 'д', h: 'ч',
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
@@ -67,10 +67,11 @@ const T = {
     categories: 'Task categories', fin_categories: 'Expense categories', add_cat: 'Add category', name: 'Name', data: 'Data',
     export_json: 'Export JSON (backup)', import_json: 'Import JSON', export_csv: 'Export CSV',
     sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in app/config.js (see README.md).',
-    sync_in: 'Signed in', sync_email: 'Email', sync_send: 'Get code', sync_code: 'Code from email', sync_verify: 'Sign in',
-    sync_sent: 'Code sent to your email. Enter it below.', sync_fail: 'Sync error. Check your connection.', sync_bad_code: 'Wrong code',
-    sync_now: 'Sync now', sync_out: 'Sign out',
-    sync_hint: 'When signing in on a new device, server data replaces local data if the server already has data.',
+    sync_in: 'Signed in', sync_email: 'Email', sync_send: 'Send sign-in link',
+    sync_link_sent: 'Sign-in link sent to', sync_again: 'Send again',
+    sync_fail: 'Sync error. Check your connection.',
+    sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
+    sync_hint: 'Open the link from the email on the device you want to sign in on. When signing in on a new device, server data replaces local data if the server already has data.',
     d: 'd', h: 'h',
     wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     cat_sport: 'Sport', cat_work: 'Work', cat_rest: 'Rest', cat_study: 'Study', cat_home: 'Home',
@@ -115,7 +116,7 @@ let S = load();
 const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null };
 
 function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
-function persist() { save(); render(); schedulePush(); }
+function persist() { ver++; setDirty(true); save(); render(); schedulePush(); }
 
 function t(k) { return (T[S.lang] && T[S.lang][k]) ?? T.ru[k] ?? k; }
 function locale() { return S.lang === 'ru' ? 'ru-RU' : 'en-US'; }
@@ -520,6 +521,9 @@ function render() {
 }
 
 const SYNC_KEY = 'timecon.sync';
+let ver = 0;
+let dirty = localStorage.getItem('timecon.dirty') === '1' || !localStorage.getItem(SYNC_KEY);
+function setDirty(v) { dirty = v; localStorage.setItem('timecon.dirty', v ? '1' : '0'); }
 const cfg = window.TIMECON_SUPABASE || {};
 const sync = { user: null, client: null, updated: 0, timer: null, email: '', sent: false, msg: '' };
 try { sync.updated = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}').updated || 0; } catch (e) { /* пусто */ }
@@ -534,42 +538,70 @@ function sbc() {
 function schedulePush() {
   if (!sync.user) return;
   clearTimeout(sync.timer);
-  sync.timer = setTimeout(flushPush, 800);
+  sync.timer = setTimeout(() => syncCycle().catch(failSync), 800);
+}
+function unionById(a = [], b = []) {
+  const m = new Map();
+  [...b, ...a].forEach((x) => m.set(x.id, x));
+  return [...m.values()];
+}
+function mergeState(local, remote) {
+  const base = { ...defaults(), ...remote };
+  const days = { ...base.days };
+  Object.keys(local.days || {}).forEach((k) => { days[k] = unionById(local.days[k], base.days[k]); });
+  return {
+    ...base,
+    lang: local.lang, theme: local.theme, currency: local.currency,
+    cats: unionById(local.cats, base.cats),
+    presets: { ...base.presets, ...local.presets },
+    days,
+    backlog: unionById(local.backlog, base.backlog),
+    running: local.running || base.running,
+    fin: {
+      ...base.fin,
+      ...local.fin,
+      cats: unionById(local.fin.cats, base.fin.cats),
+      incomes: unionById(local.fin.incomes, base.fin.incomes),
+      expenses: unionById(local.fin.expenses, base.fin.expenses),
+    },
+  };
 }
 async function uploadNow() {
   const now = Date.now();
+  const v = ver;
   const { error } = await sbc().from('timecon_state').upsert({ user_id: sync.user.id, data: S, updated_at: now });
   if (error) throw error;
   syncMeta(now);
+  if (v === ver) setDirty(false);
 }
-async function pullRemote() {
+async function syncCycle() {
+  if (!sync.user) return;
   const { data, error } = await sbc().from('timecon_state').select('data, updated_at').eq('user_id', sync.user.id).maybeSingle();
   if (error) throw error;
   if (!data) {
     await uploadNow();
-  } else if (Number(data.updated_at) > sync.updated) {
-    S = { ...defaults(), ...data.data };
-    save();
-    syncMeta(Number(data.updated_at));
+  } else if (Number(data.updated_at) !== sync.updated) {
+    if (dirty) {
+      S = mergeState(S, data.data);
+      save();
+      await uploadNow();
+    } else {
+      S = { ...defaults(), ...data.data };
+      save();
+      syncMeta(Number(data.updated_at));
+    }
+  } else if (dirty) {
+    await uploadNow();
   }
   sync.msg = '';
   render();
 }
-async function flushPush() {
-  if (!sync.user) return;
-  try {
-    const { data, error } = await sbc().from('timecon_state').select('updated_at').eq('user_id', sync.user.id).maybeSingle();
-    if (error) throw error;
-    if (data && Number(data.updated_at) > sync.updated) await pullRemote();
-    else await uploadNow();
-    sync.msg = '';
-  } catch (e) {
-    sync.msg = 'sync_fail';
-    render();
-  }
+function failSync() {
+  sync.msg = 'sync_fail';
+  render();
 }
 function pullSafe() {
-  pullRemote().catch(() => { sync.msg = 'sync_fail'; render(); });
+  syncCycle().catch(failSync);
 }
 function syncInit() {
   const c = sbc();
@@ -580,6 +612,7 @@ function syncInit() {
     else render();
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
+  setInterval(() => { if (sync.user && !document.hidden) pullSafe(); }, 15000);
 }
 async function syncSend(email) {
   const redirect = location.href.split('#')[0].split('?')[0];
@@ -592,6 +625,7 @@ async function syncSend(email) {
 function viewSync() {
   if (!sbc()) return `<p class="muted">${t('sync_not_config')}</p>`;
   if (sync.user) return `<p class="muted">${t('sync_in')}: ${esc(sync.user.email)}</p>
+    <p class="muted">${t('sync_last')}: ${sync.updated ? new Date(sync.updated).toLocaleString(locale()) : '—'}</p>
     <div class="acts"><button data-act="syncNow">${t('sync_now')}</button><button class="ghost" data-act="syncOut">${t('sync_out')}</button></div>
     ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
   if (!sync.sent) return `<form class="form" data-form="syncSend">
@@ -634,7 +668,7 @@ document.addEventListener('click', (e) => {
       else S.fin.cats = S.fin.cats.filter((c) => c.id !== id);
       break;
     }
-    case 'syncNow': flushPush().then(render); return;
+    case 'syncNow': syncCycle().catch(failSync); return;
     case 'syncOut': sbc().auth.signOut(); sync.sent = false; return;
     case 'syncReset': sync.sent = false; sync.msg = ''; render(); return;
     case 'export': exportJSON(); return;
