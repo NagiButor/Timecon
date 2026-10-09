@@ -151,3 +151,5 @@ label.check input { width: auto; }
 .note-block textarea.code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; background: var(--bg); }
 .note-photo { width: 100%; border-radius: 10px; display: block; }
 .toolbar .muted { font-size: 12px; }
+.hint { font-size: 12px; margin: 0; }
+.move button { justify-content: center; }

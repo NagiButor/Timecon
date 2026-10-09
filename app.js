@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v9';
+const BUILD = 'v10';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -54,6 +54,9 @@ const T = {
     note_blocks_hint: 'Блоки идут сверху вниз: текст, фото, код. Добавляй в нужном порядке.',
     note_photo_fail: 'Не удалось прочитать фото', note_blocks: 'Блоки', back: 'Назад', started_at: 'Начало',
     storage_full: 'Память заполнена. Удали лишние фото из заметок.',
+    auto_start: 'Автозапуск в (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
+    auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если время прошло больше двух часов назад, задача останется обычной.',
+    reorder: 'Порядок', up: 'Выше', down: 'Ниже',
   },
   en: {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
@@ -91,6 +94,9 @@ const T = {
     note_blocks_hint: 'Blocks stack top to bottom: text, photo, code. Add them in any order.',
     note_photo_fail: 'Could not read the photo', note_blocks: 'Blocks', back: 'Back', started_at: 'Started',
     storage_full: 'Storage is full. Remove some photos from notes.',
+    auto_start: 'Auto-start at (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
+    auto_hint: 'The task starts by itself at the set time when the app is open. If that time was more than two hours ago, it stays a normal task.',
+    reorder: 'Order', up: 'Up', down: 'Down',
   },
 };
 
@@ -135,7 +141,7 @@ function migrate(st) {
   return st;
 }
 let S = load();
-const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, noteId: null, noteIconPick: false };
+const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false };
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -231,8 +237,8 @@ function deleteTask(id) {
   if (!f || f.task.status === 'running') return;
   S.days[f.key] = S.days[f.key].filter((x) => x.id !== id);
 }
-function startTask(id) {
-  if (S.running) { alert(t('busy')); return; }
+function startTask(id, silent) {
+  if (S.running) { if (!silent) alert(t('busy')); return; }
   const f = findTask(id);
   if (!f || f.task.status !== 'pending') return;
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
@@ -263,6 +269,19 @@ function moveTask(id, when, date) {
   if (when === 'later') { S.backlog.push(f.task); return; }
   const target = when === 'date' ? (date || f.key) : addDays(keyOf(new Date()), +when);
   addTaskTo(target, f.task);
+}
+function reorderTask(id, dir) {
+  const arr = S.days[ui.day] || [];
+  const i = arr.findIndex((x) => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+}
+function setAutoTime(id, value) {
+  const f = findTask(id);
+  if (!f) return;
+  f.task.startAt = value || null;
+  f.task.autoDone = false;
 }
 function fromBacklog(id) {
   const x = S.backlog.find((y) => y.id === id);
@@ -296,13 +315,40 @@ function alarm(title) {
   }
 }
 function tick() {
-  if (!S.running) return;
-  const left = S.running.endAt - Date.now();
-  if (left <= 0) { finishTimer(); persist(); return; }
-  const el = document.querySelector('[data-timer]');
-  if (el) el.textContent = fmtClock(left);
+  if (S.running) {
+    const left = S.running.endAt - Date.now();
+    if (left <= 0) { finishTimer(); persist(); return; }
+    const el = document.querySelector('[data-timer]');
+    if (el) el.textContent = fmtClock(left);
+    return;
+  }
+  autoStartTick();
 }
 setInterval(tick, 500);
+
+// Автозапуск задач, у которых задано время старта. Работает, пока приложение открыто.
+const AUTO_WINDOW = 120 * 60000;
+function autoStartTick() {
+  const today = keyOf(new Date());
+  const list = S.days[today] || [];
+  const now = Date.now();
+  let best = null, bestTs = Infinity;
+  list.forEach((x) => {
+    if (x.status !== 'pending' || !x.startAt || x.autoDone) return;
+    const [h, m] = String(x.startAt).split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return;
+    const at = parseKey(today);
+    at.setHours(h, m, 0, 0);
+    const diff = now - at.getTime();
+    if (diff >= 0 && diff <= AUTO_WINDOW && at.getTime() < bestTs) { best = x; bestTs = at.getTime(); }
+  });
+  if (!best) return;
+  const f = findTask(best.id);
+  if (!f) return;
+  f.task.autoDone = true;
+  startTask(best.id, true);
+  persist();
+}
 
 function download(name, text, mime) {
   const a = document.createElement('a');
@@ -322,7 +368,7 @@ function exportCSV() {
   download(`timecon-${keyOf(new Date())}.csv`, '\uFEFF' + rows.map((r) => r.map(q).join(',')).join('\n'), 'text/csv');
 }
 
-function taskCard(x) {
+function taskCard(x, i, total) {
   const c = catById(x.catId) || { icon: 'star', color: '#8b93a7' };
   let body = '';
   if (x.status === 'running') {
@@ -332,8 +378,14 @@ function taskCard(x) {
       <button class="ok" data-act="verdict" data-id="${x.id}" data-v="done">${icon('check')} ${t('verdict_done')}</button>
       <button class="bad" data-act="verdict" data-id="${x.id}" data-v="failed">${icon('x')} ${t('verdict_failed')}</button></div>`;
   } else if (x.status === 'pending') {
+    const order = ui.sort === 'manual'
+      ? `<button class="icon-btn" data-act="up" data-id="${x.id}" ${i === 0 ? 'disabled' : ''} title="${t('up')}">${icon('right', 'rot-up')}</button>
+         <button class="icon-btn" data-act="down" data-id="${x.id}" ${i === total - 1 ? 'disabled' : ''} title="${t('down')}">${icon('right', 'rot-down')}</button>`
+      : '';
     body = `<div class="acts">
       <button class="primary" data-act="start" data-id="${x.id}" ${S.running ? 'disabled' : ''}>${icon('play')} ${t('start')}</button>
+      <button class="icon-btn" data-act="time" data-id="${x.id}" title="${t('auto_on')}">${icon('clock')}</button>
+      ${order}
       <button class="icon-btn" data-act="move" data-id="${x.id}" title="${t('move')}">${icon('move')}</button>
       <button class="icon-btn" data-act="del" data-id="${x.id}" title="${t('delete')}">${icon('trash')}</button></div>`;
   } else {
@@ -350,10 +402,15 @@ function taskCard(x) {
       </select>
       <input type="date" name="date" value="${addDays(ui.day, 1)}">
       <button class="primary">${t('ok')}</button></form>` : '';
+  const timeForm = ui.timeId === x.id ? `<form class="move" data-form="setTime" data-id="${x.id}">
+      <input type="time" name="time" value="${esc(x.startAt || '')}">
+      <button class="primary" type="submit">${t('ok')}</button>
+      <button class="ghost" type="button" data-act="timeClear" data-id="${x.id}">${t('auto_off')}</button></form>` : '';
+  const auto = x.startAt ? ` · ${t('auto_at')} ${esc(x.startAt)}` : '';
   return `<li class="task ${x.status}" style="--c:${c.color}">
     <div class="task-head"><span class="cat-ico">${icon(c.icon)}</span>
-      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}</small></div>${mark}</div>
-    ${body}${moveForm}</li>`;
+      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${auto}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}</small></div>${mark}</div>
+    ${body}${moveForm}${timeForm}</li>`;
 }
 
 function viewTasks() {
@@ -373,13 +430,15 @@ function viewTasks() {
         <select data-change="sort">${sorts.map(([v, k]) => `<option value="${v}" ${ui.sort === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select>
       </label>
     </div>
-    <ul class="tasks">${list.length ? list.map(taskCard).join('') : `<li class="empty">${t('no_tasks')}</li>`}</ul>
+    <ul class="tasks">${list.length ? list.map((x, i) => taskCard(x, i, list.length)).join('') : `<li class="empty">${t('no_tasks')}</li>`}</ul>
     <form class="card form" data-form="addTask">
       <input name="title" placeholder="${t('task_title')}" required maxlength="80">
       <div class="row2">
         <label>${t('minutes')}<input name="minutes" type="number" min="1" max="600" value="25"></label>
         <label>${t('category')}<select name="cat">${S.cats.map((c) => `<option value="${c.id}">${esc(label(c))}</option>`).join('')}</select></label>
       </div>
+      <label>${t('auto_start')}<input name="startAt" type="time"></label>
+      <p class="muted hint">${t('auto_hint')}</p>
       <button class="primary">${icon('plus')} ${t('add')}</button>
     </form>
     <section class="card">
@@ -864,9 +923,13 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   switch (a) {
-    case 'tab': ui.view = b.dataset.v; ui.moveId = null; ui.noteId = null; break;
-    case 'day': ui.day = addDays(ui.day, +b.dataset.n); ui.moveId = null; break;
+    case 'tab': ui.view = b.dataset.v; ui.moveId = null; ui.timeId = null; ui.noteId = null; break;
+    case 'day': ui.day = addDays(ui.day, +b.dataset.n); ui.moveId = null; ui.timeId = null; break;
     case 'today': ui.day = keyOf(new Date()); break;
+    case 'up': reorderTask(id, -1); break;
+    case 'down': reorderTask(id, 1); break;
+    case 'time': ui.timeId = ui.timeId === id ? null : id; break;
+    case 'timeClear': setAutoTime(id, ''); ui.timeId = null; break;
     case 'month': ui.month = shiftMonth(ui.month, +b.dataset.n); break;
     case 'period': ui.period = b.dataset.p; break;
     case 'noteNew': {
@@ -955,9 +1018,14 @@ document.addEventListener('submit', (e) => {
       const title = String(fd.get('title') || '').trim();
       if (!title) return;
       const minutes = Math.max(1, Math.min(600, parseInt(fd.get('minutes'), 10) || 25));
-      addTaskTo(ui.day, { id: uid(), title, minutes, catId: fd.get('cat'), status: 'pending' });
+      const startAt = String(fd.get('startAt') || '').trim() || null;
+      addTaskTo(ui.day, { id: uid(), title, minutes, catId: fd.get('cat'), status: 'pending', startAt });
       break;
     }
+    case 'setTime':
+      setAutoTime(f.dataset.id, String(fd.get('time') || '').trim());
+      ui.timeId = null;
+      break;
     case 'move':
       moveTask(f.dataset.id, fd.get('when'), fd.get('date'));
       ui.moveId = null;
