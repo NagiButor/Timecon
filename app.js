@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v8';
+const BUILD = 'v9';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -48,6 +48,12 @@ const T = {
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
     cat_sport: 'Спорт', cat_work: 'Работа', cat_rest: 'Отдых', cat_study: 'Учёба', cat_home: 'Дом',
     fcat_food: 'Еда', fcat_home: 'Жильё', fcat_fun: 'Развлечения', fcat_other: 'Прочее',
+    notes: 'Заметки', note_new: 'Новая заметка', note_title: 'Название заметки', note_icon: 'Иконка',
+    note_add_text: 'Текст', note_add_photo: 'Фото', note_add_code: 'Код', note_updated: 'Изменено',
+    note_empty: 'Заметок пока нет. Создай первую.', note_code_lang: 'Язык', note_confirm_del: 'Удалить заметку?',
+    note_blocks_hint: 'Блоки идут сверху вниз: текст, фото, код. Добавляй в нужном порядке.',
+    note_photo_fail: 'Не удалось прочитать фото', note_blocks: 'Блоки', back: 'Назад', started_at: 'Начало',
+    storage_full: 'Память заполнена. Удали лишние фото из заметок.',
   },
   en: {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
@@ -79,6 +85,12 @@ const T = {
     wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     cat_sport: 'Sport', cat_work: 'Work', cat_rest: 'Rest', cat_study: 'Study', cat_home: 'Home',
     fcat_food: 'Food', fcat_home: 'Housing', fcat_fun: 'Fun', fcat_other: 'Other',
+    notes: 'Notes', note_new: 'New note', note_title: 'Note title', note_icon: 'Icon',
+    note_add_text: 'Text', note_add_photo: 'Photo', note_add_code: 'Code', note_updated: 'Updated',
+    note_empty: 'No notes yet. Create the first one.', note_code_lang: 'Language', note_confirm_del: 'Delete this note?',
+    note_blocks_hint: 'Blocks stack top to bottom: text, photo, code. Add them in any order.',
+    note_photo_fail: 'Could not read the photo', note_blocks: 'Blocks', back: 'Back', started_at: 'Started',
+    storage_full: 'Storage is full. Remove some photos from notes.',
   },
 };
 
@@ -95,6 +107,7 @@ function defaults() {
     presets: {},
     days: {},
     backlog: [],
+    notes: [],
     running: null,
     fin: {
       cats: [
@@ -122,10 +135,15 @@ function migrate(st) {
   return st;
 }
 let S = load();
-const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null };
+const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, noteId: null, noteIconPick: false };
 
-function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { alert(t('storage_full')); }
+}
 function persist() { ver++; setDirty(true); save(); render(); schedulePush(); }
+// Изменение без перерисовки — чтобы не сбрасывать ввод при наборе текста.
+function touch() { ver++; setDirty(true); save(); schedulePush(); }
 
 function t(k) { return (T[S.lang] && T[S.lang][k]) ?? T.ru[k] ?? k; }
 function locale() { return S.lang === 'ru' ? 'ru-RU' : 'en-US'; }
@@ -144,6 +162,8 @@ function fmtDur(min) {
 }
 function fmtClock(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`; }
 function fmtDate(k) { return parseKey(k).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' }); }
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+const fmtDateTime = (ts) => new Date(ts).toLocaleString(locale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 function findTask(id) {
   for (const k in S.days) {
     const x = S.days[k].find((y) => y.id === id);
@@ -216,7 +236,9 @@ function startTask(id) {
   const f = findTask(id);
   if (!f || f.task.status !== 'pending') return;
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
-  S.running = { taskId: id, endAt: Date.now() + f.task.minutes * 60000 };
+  const startedAt = Date.now();
+  S.running = { taskId: id, endAt: startedAt + f.task.minutes * 60000, startedAt };
+  f.task.startedAt = startedAt;
   f.task.status = 'running';
 }
 function finishTimer() {
@@ -330,7 +352,7 @@ function taskCard(x) {
       <button class="primary">${t('ok')}</button></form>` : '';
   return `<li class="task ${x.status}" style="--c:${c.color}">
     <div class="task-head"><span class="cat-ico">${icon(c.icon)}</span>
-      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}</small></div>${mark}</div>
+      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}</small></div>${mark}</div>
     ${body}${moveForm}</li>`;
 }
 
@@ -520,8 +542,110 @@ function viewSettings() {
     <section class="card"><h3>${t('sync_title')}</h3>${viewSync()}</section>`;
 }
 
-const NAV = [['tasks', 'tasks'], ['stats', 'chart'], ['finance', 'wallet'], ['settings', 'gear']];
-const VIEWS = { tasks: viewTasks, stats: viewStats, finance: viewFinance, settings: viewSettings };
+const NOTE_ICONS = ['note', 'note2', 'filetext', 'image', 'pin', 'list', 'clipboard', 'palette', 'star', 'heart', 'book', 'briefcase', 'code', 'music', 'cart', 'home'];
+
+function notePreview(n) {
+  const b = (n.blocks || []).find((x) => (x.type === 'text' || x.type === 'code') && x.text && x.text.trim());
+  if (b) return b.text.trim().replace(/\s+/g, ' ').slice(0, 90);
+  if ((n.blocks || []).some((x) => x.type === 'photo')) return t('note_add_photo');
+  return t('none');
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1280;
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+        const cv = document.createElement('canvas');
+        cv.width = w;
+        cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = () => reject(new Error('image'));
+      img.src = fr.result;
+    };
+    fr.onerror = () => reject(new Error('read'));
+    fr.readAsDataURL(file);
+  });
+}
+async function noteAddPhotos(files) {
+  const n = S.notes.find((x) => x.id === ui.noteId);
+  if (!n) return;
+  for (const f of files) {
+    try {
+      const src = await fileToDataUrl(f);
+      n.blocks.push({ id: uid(), type: 'photo', src });
+    } catch (e) { alert(t('note_photo_fail')); }
+  }
+  n.updatedAt = Date.now();
+  persist();
+}
+function noteCard(n) {
+  return `<div class="card note-card" data-act="noteOpen" data-id="${n.id}">
+    <div class="note-head"><span class="note-ico">${icon(n.icon || 'note')}</span>
+      <div class="note-meta"><b>${esc(n.title || t('note_title'))}</b>
+      <small>${t('note_updated')}: ${fmtDateTime(n.updatedAt || Date.now())}</small></div>
+      <button class="icon-btn" data-act="noteDel" data-id="${n.id}">${icon('trash')}</button></div>
+    <p class="muted">${esc(notePreview(n))}</p></div>`;
+}
+function noteBlock(b, i, total) {
+  const typeName = b.type === 'text' ? t('note_add_text') : b.type === 'photo' ? t('note_add_photo') : t('note_add_code');
+  let body = '';
+  if (b.type === 'photo') {
+    body = `<img class="note-photo" src="${esc(b.src)}" alt="">`;
+  } else if (b.type === 'code') {
+    body = `<input data-lang="${b.id}" value="${esc(b.lang || '')}" placeholder="${t('note_code_lang')}" maxlength="20">
+      <textarea class="code" data-block="${b.id}" rows="4" spellcheck="false" placeholder="${t('note_add_code')}">${esc(b.text || '')}</textarea>`;
+  } else {
+    body = `<textarea data-block="${b.id}" rows="3" placeholder="${t('note_add_text')}">${esc(b.text || '')}</textarea>`;
+  }
+  return `<div class="card note-block">
+    <div class="note-block-head"><span class="muted">${typeName}</span>
+      <button class="icon-btn" data-act="noteUp" data-id="${b.id}" ${i === 0 ? 'disabled' : ''}>${icon('right', 'rot-up')}</button>
+      <button class="icon-btn" data-act="noteDown" data-id="${b.id}" ${i === total - 1 ? 'disabled' : ''}>${icon('right', 'rot-down')}</button>
+      <button class="icon-btn" data-act="noteBlockDel" data-id="${b.id}">${icon('trash')}</button></div>
+    ${body}</div>`;
+}
+function viewNoteEditor() {
+  const n = S.notes.find((x) => x.id === ui.noteId);
+  if (!n) { ui.noteId = null; return viewNotes(); }
+  const picker = ui.noteIconPick
+    ? `<div class="icon-grid">${NOTE_ICONS.map((nm) => `<button class="ico ${n.icon === nm ? 'on' : ''}" data-act="noteIconSet" data-icon="${nm}">${icon(nm)}</button>`).join('')}</div>`
+    : '';
+  return `
+    <div class="toolbar">
+      <button class="ghost" data-act="noteBack">${icon('left')} ${t('back')}</button>
+      <span class="muted" id="noteUpdated">${t('note_updated')}: ${fmtDateTime(n.updatedAt || Date.now())}</span>
+    </div>
+    <div class="card form">
+      <div class="note-title-row">
+        <button class="icon-btn note-ico-btn" data-act="noteIconPick" title="${t('note_icon')}">${icon(n.icon || 'note')}</button>
+        <input data-note-title value="${esc(n.title || '')}" placeholder="${t('note_title')}" maxlength="80">
+      </div>
+      ${picker}
+    </div>
+    <div class="note-blocks">${n.blocks.length ? n.blocks.map((b, i) => noteBlock(b, i, n.blocks.length)).join('') : `<p class="empty">${t('none')}</p>`}</div>
+    <div class="card acts">
+      <button data-act="noteAdd" data-type="text">${icon('filetext')} ${t('note_add_text')}</button>
+      <button data-act="notePickPhoto">${icon('image')} ${t('note_add_photo')}</button>
+      <button data-act="noteAdd" data-type="code">${icon('code')} ${t('note_add_code')}</button>
+    </div>
+    <p class="muted">${t('note_blocks_hint')}</p>
+    <input type="file" id="notePhoto" accept="image/*" multiple hidden data-change="notePhoto">`;
+}
+function viewNotes() {
+  if (ui.noteId) return viewNoteEditor();
+  const notes = [...S.notes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return `<button class="primary" data-act="noteNew">${icon('plus')} ${t('note_new')}</button>
+    ${notes.length ? notes.map(noteCard).join('') : `<p class="empty">${t('note_empty')}</p>`}`;
+}
+
+const NAV = [['tasks', 'tasks'], ['notes', 'note'], ['stats', 'chart'], ['finance', 'wallet'], ['settings', 'gear']];
+const VIEWS = { tasks: viewTasks, notes: viewNotes, stats: viewStats, finance: viewFinance, settings: viewSettings };
 
 let renderedView = null;
 function fieldKeys(root) {
@@ -615,6 +739,7 @@ function mergeState(local, remote) {
     presets: { ...base.presets, ...local.presets },
     days,
     backlog: unionById(local.backlog, base.backlog),
+    notes: unionById(local.notes, base.notes),
     running: local.running || base.running,
     fin: {
       ...base.fin,
@@ -739,11 +864,58 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   switch (a) {
-    case 'tab': ui.view = b.dataset.v; ui.moveId = null; break;
+    case 'tab': ui.view = b.dataset.v; ui.moveId = null; ui.noteId = null; break;
     case 'day': ui.day = addDays(ui.day, +b.dataset.n); ui.moveId = null; break;
     case 'today': ui.day = keyOf(new Date()); break;
     case 'month': ui.month = shiftMonth(ui.month, +b.dataset.n); break;
     case 'period': ui.period = b.dataset.p; break;
+    case 'noteNew': {
+      const n = { id: uid(), title: '', icon: 'note', updatedAt: Date.now(), blocks: [{ id: uid(), type: 'text', text: '' }] };
+      S.notes.push(n);
+      ui.noteId = n.id;
+      ui.noteIconPick = false;
+      break;
+    }
+    case 'noteOpen': ui.noteId = id; ui.noteIconPick = false; render(); return;
+    case 'noteBack': ui.noteId = null; ui.noteIconPick = false; render(); return;
+    case 'noteDel': {
+      if (!confirm(t('note_confirm_del'))) return;
+      S.notes = S.notes.filter((x) => x.id !== id);
+      if (ui.noteId === id) ui.noteId = null;
+      break;
+    }
+    case 'noteIconPick': ui.noteIconPick = !ui.noteIconPick; render(); return;
+    case 'noteIconSet': {
+      const n = S.notes.find((x) => x.id === ui.noteId);
+      if (n) { n.icon = b.dataset.icon; n.updatedAt = Date.now(); }
+      ui.noteIconPick = false;
+      break;
+    }
+    case 'notePickPhoto': { const el = $('#notePhoto'); if (el) el.click(); return; }
+    case 'noteAdd': {
+      const n = S.notes.find((x) => x.id === ui.noteId);
+      if (!n) return;
+      n.blocks.push(b.dataset.type === 'code' ? { id: uid(), type: 'code', lang: '', text: '' } : { id: uid(), type: 'text', text: '' });
+      n.updatedAt = Date.now();
+      break;
+    }
+    case 'noteBlockDel': {
+      const n = S.notes.find((x) => x.id === ui.noteId);
+      if (!n) return;
+      n.blocks = n.blocks.filter((x) => x.id !== id);
+      n.updatedAt = Date.now();
+      break;
+    }
+    case 'noteUp': case 'noteDown': {
+      const n = S.notes.find((x) => x.id === ui.noteId);
+      if (!n) return;
+      const i = n.blocks.findIndex((x) => x.id === id);
+      const j = a === 'noteUp' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= n.blocks.length) return;
+      [n.blocks[i], n.blocks[j]] = [n.blocks[j], n.blocks[i]];
+      n.updatedAt = Date.now();
+      break;
+    }
     case 'start': startTask(id); break;
     case 'verdict': verdict(id, b.dataset.v); break;
     case 'restore': setPending(id); break;
@@ -830,9 +1002,32 @@ document.addEventListener('submit', (e) => {
   syncAuth(mode, String(fd.get('email') || '').trim(), String(fd.get('password') || ''));
 });
 
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  const n = ui.noteId ? S.notes.find((x) => x.id === ui.noteId) : null;
+  if (!n) return;
+  let handled = false;
+  if (el.dataset.block) {
+    const b = n.blocks.find((x) => x.id === el.dataset.block);
+    if (b) { b.text = el.value; handled = true; }
+  } else if (el.dataset.lang) {
+    const b = n.blocks.find((x) => x.id === el.dataset.lang);
+    if (b) { b.lang = el.value; handled = true; }
+  } else if (el.hasAttribute('data-note-title')) {
+    n.title = el.value;
+    handled = true;
+  }
+  if (!handled) return;
+  n.updatedAt = Date.now();
+  touch();
+  const upd = $('#noteUpdated');
+  if (upd) upd.textContent = `${t('note_updated')}: ${fmtDateTime(n.updatedAt)}`;
+});
+
 document.addEventListener('change', (e) => {
   const el = e.target;
   if (el.dataset.change === 'sort') { ui.sort = el.value; render(); }
+  if (el.dataset.change === 'notePhoto') { noteAddPhotos([...el.files]); el.value = ''; }
   if (el.dataset.change === 'import') {
     const f = el.files[0];
     if (!f) return;

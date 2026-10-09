@@ -122,13 +122,32 @@ label.check input { width: auto; }
 .ico input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .ico:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+  position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--card); border-top: 1px solid var(--border);
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
 }
 .tabbar button {
-  flex-direction: column; background: none; border: 0; color: var(--muted); font-size: 12px;
-  justify-content: center; gap: 2px;
+  flex-direction: column; background: none; border: 0; color: var(--muted); font-size: 11px;
+  justify-content: center; gap: 2px; padding: 6px 2px;
 }
 .tabbar button.on { color: var(--accent); }
 .daybar button.icon-btn { padding: 6px 10px; }
+.ic.rot-up { transform: rotate(-90deg); }
+.ic.rot-down { transform: rotate(90deg); }
+.note-card { cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.note-head { display: flex; align-items: center; gap: 10px; }
+.note-ico { color: var(--accent); display: flex; }
+.note-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.note-meta b { overflow-wrap: anywhere; }
+.note-meta small { color: var(--muted); }
+.note-title-row { display: flex; align-items: center; gap: 8px; }
+.note-ico-btn { color: var(--accent); padding: 8px; }
+.ico.on { border-color: var(--accent); color: var(--accent); }
+.note-blocks { display: flex; flex-direction: column; gap: 10px; }
+.note-block { display: flex; flex-direction: column; gap: 8px; }
+.note-block-head { display: flex; align-items: center; gap: 4px; }
+.note-block-head .muted { flex: 1; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.note-block textarea { width: 100%; resize: vertical; font: inherit; line-height: 1.45; }
+.note-block textarea.code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; background: var(--bg); }
+.note-photo { width: 100%; border-radius: 10px; display: block; }
+.toolbar .muted { font-size: 12px; }

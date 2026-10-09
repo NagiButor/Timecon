@@ -1,5 +1,5 @@
-const CACHE = 'timecon-v8';
-const ASSETS = ['./', 'index.html', 'styles.css?v=8', 'config.js?v=8', 'icons.js?v=8', 'app.js?v=8', 'manifest.webmanifest', 'icon.svg'];
+const CACHE = 'timecon-v9';
+const ASSETS = ['./', 'index.html', 'styles.css?v=9', 'config.js?v=9', 'icons.js?v=9', 'app.js?v=9', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
