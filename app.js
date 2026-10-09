@@ -85,11 +85,11 @@ function defaults() {
   return {
     v: 1, lang: 'ru', theme: 'dark', currency: 'RUB',
     cats: [
-      { id: 'c_sport', key: 'cat_sport', icon: 'dumbbell', color: '#9ece6a' },
-      { id: 'c_work', key: 'cat_work', icon: 'briefcase', color: '#7aa2f7' },
-      { id: 'c_rest', key: 'cat_rest', icon: 'coffee', color: '#e0af68' },
-      { id: 'c_study', key: 'cat_study', icon: 'book', color: '#bb9af7' },
-      { id: 'c_home', key: 'cat_home', icon: 'home', color: '#73daca' },
+      { id: 'c_sport', key: 'cat_sport', icon: 'dumbbell', color: '#d4af37' },
+      { id: 'c_work', key: 'cat_work', icon: 'briefcase', color: '#e0a458' },
+      { id: 'c_rest', key: 'cat_rest', icon: 'coffee', color: '#c2a878' },
+      { id: 'c_study', key: 'cat_study', icon: 'book', color: '#b08968' },
+      { id: 'c_home', key: 'cat_home', icon: 'home', color: '#9caf88' },
     ],
     presets: {},
     days: {},
@@ -478,7 +478,7 @@ function catEditor(kind, list, formKind) {
     <form class="form" data-form="${formKind}">
       <input name="name" placeholder="${t('name')}" required maxlength="30">
       <div class="icon-grid">${CAT_ICONS.map((n, i) => `<label class="ico"><input type="radio" name="icon" value="${n}" ${i === 0 ? 'checked' : ''}>${icon(n)}</label>`).join('')}</div>
-      ${kind === 'cats' ? '<input name="color" type="color" value="#7aa2f7">' : ''}
+      ${kind === 'cats' ? '<input name="color" type="color" value="#d4af37">' : ''}
       <button class="primary">${icon('plus')} ${t('add_cat')}</button>
     </form>`;
 }
@@ -739,7 +739,7 @@ document.addEventListener('submit', (e) => {
     case 'addCat': {
       const name = String(fd.get('name') || '').trim();
       if (!name) return;
-      S.cats.push({ id: uid(), name, icon: fd.get('icon') || 'star', color: fd.get('color') || '#7aa2f7' });
+      S.cats.push({ id: uid(), name, icon: fd.get('icon') || 'star', color: fd.get('color') || '#d4af37' });
       break;
     }
     case 'addFinCat': {

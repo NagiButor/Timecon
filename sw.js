@@ -1,4 +1,4 @@
-const CACHE = 'timecon-v4';
+const CACHE = 'timecon-v5';
 const ASSETS = ['./', 'index.html', 'styles.css', 'config.js', 'icons.js', 'app.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
