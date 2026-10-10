@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v12';
+const BUILD = 'v13';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -899,17 +899,14 @@ function restoreFields(snap) {
 }
 function render() {
   const snap = captureFields();
-  const mainEl = $('#main');
-  const keepScroll = (renderedView === ui.view && mainEl) ? mainEl.scrollTop : 0;
+  const keepScroll = renderedView === ui.view ? window.scrollY : 0;
   document.documentElement.dataset.theme = S.theme;
   document.documentElement.lang = S.lang;
   $('#nav').innerHTML = NAV.map(([v, ic]) => `<button class="${ui.view === v ? 'on' : ''}" data-act="tab" data-v="${v}">${icon(ic)}<span>${t(v)}</span></button>`).join('');
-  if (mainEl) {
-    mainEl.innerHTML = VIEWS[ui.view]();
-    mainEl.scrollTop = keepScroll;
-  }
+  $('#main').innerHTML = VIEWS[ui.view]();
   renderedView = ui.view;
   restoreFields(snap);
+  window.scrollTo(0, keepScroll);
 }
 
 const SYNC_KEY = 'timecon.sync';
