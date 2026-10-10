@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v22';
+const BUILD = 'v23';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -42,6 +42,11 @@ const T = {
     sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни config.js (см. README.md).',
     sync_in: 'Вход выполнен', sync_email: 'Почта', sync_password: 'Пароль (минимум 6 символов)',
     sync_login: 'Войти', sync_signup: 'Регистрация',
+    sync_google: 'Войти через Google', sync_forgot: 'Забыл пароль', sync_forgot_send: 'Отправить ссылку',
+    sync_forgot_sent: 'Ссылка для сброса пароля отправлена на почту. Проверь и папку «Спам».',
+    sync_recovery_title: 'Новый пароль', sync_password2: 'Повтори пароль', sync_set_password: 'Сохранить пароль',
+    sync_password_mismatch: 'Пароли не совпадают', sync_password_updated: 'Пароль обновлён. Ты вошёл в аккаунт.',
+    sync_standalone_hint: 'Приложение открыто с экрана «Домой»: если вход через Google не возвращает в приложение, войди с почтой и паролем.',
     sync_check_email: 'Аккаунт создан. Войди с этой почтой и паролем.',
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
     sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
@@ -88,6 +93,11 @@ const T = {
     sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in config.js (see README.md).',
     sync_in: 'Signed in', sync_email: 'Email', sync_password: 'Password (min 6 characters)',
     sync_login: 'Sign in', sync_signup: 'Sign up',
+    sync_google: 'Sign in with Google', sync_forgot: 'Forgot password', sync_forgot_send: 'Send link',
+    sync_forgot_sent: 'Password reset link sent to your email. Check the spam folder too.',
+    sync_recovery_title: 'New password', sync_password2: 'Repeat password', sync_set_password: 'Save password',
+    sync_password_mismatch: 'Passwords do not match', sync_password_updated: 'Password updated. You are signed in.',
+    sync_standalone_hint: 'The app is open from the Home Screen: if Google sign-in does not bring you back, sign in with email and password.',
     sync_check_email: 'Account created. Sign in with this email and password.',
     sync_fail: 'Sync error. Check your connection.',
     sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
@@ -1010,7 +1020,7 @@ let ver = 0;
 let dirty = localStorage.getItem('timecon.dirty') === '1' || !localStorage.getItem(SYNC_KEY);
 function setDirty(v) { dirty = v; localStorage.setItem('timecon.dirty', v ? '1' : '0'); }
 const cfg = window.TIMECON_SUPABASE || {};
-const sync = { user: null, client: null, channel: null, updated: 0, timer: null, email: '', sent: false, msg: '' };
+const sync = { user: null, client: null, channel: null, updated: 0, timer: null, email: '', sent: false, msg: '', recovery: false, forgot: false, forgotSent: false };
 try { sync.updated = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}').updated || 0; } catch (e) { /* пусто */ }
 
 function syncMeta(ts) { sync.updated = ts; localStorage.setItem(SYNC_KEY, JSON.stringify({ updated: ts })); }
@@ -1151,16 +1161,59 @@ function stopRealtime() {
 function syncInit() {
   const c = sbc();
   if (!c) return;
-  c.auth.onAuthStateChange((_e, session) => {
+  c.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') {
+      sync.recovery = true;
+      if (session) sync.user = session.user;
+      render();
+      updateWarn();
+      return;
+    }
     sync.user = session ? session.user : null;
     if (sync.user) { pullSafe(); watchRealtime(); }
     else { stopRealtime(); render(); }
     updateWarn();
   });
+  handleOAuthReturn();
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
   window.addEventListener('focus', () => { if (sync.user) pullSafe(); });
   // Резервная синхронизация, если Realtime-канал отключился.
   setInterval(() => { if (sync.user && !document.hidden) pullSafe(); }, 15000);
+}
+// Возврат из Google и из письма восстановления пароля: в ссылке приходит ?code=, меняем его на сессию.
+async function handleOAuthReturn() {
+  let code = null;
+  try { code = new URL(location.href).searchParams.get('code'); } catch (e) { return; }
+  if (!code || !sbc()) return;
+  try { history.replaceState(null, '', location.href.split('?')[0].split('#')[0]); } catch (e) { /* старые браузеры */ }
+  const { error } = await sbc().auth.exchangeCodeForSession(code);
+  if (error) { sync.msg = error.message; render(); }
+}
+async function syncGoogle() {
+  sync.msg = '';
+  render();
+  const { error } = await sbc().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/' } });
+  if (error) { sync.msg = error.message; render(); }
+}
+async function syncForgot(email) {
+  sync.msg = '';
+  const { error } = await sbc().auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+  sync.forgotSent = !error;
+  if (error) sync.msg = error.message;
+  render();
+}
+async function syncSetPassword(pw1, pw2) {
+  if (pw1 !== pw2) { sync.msg = 'sync_password_mismatch'; render(); return; }
+  const { error } = await sbc().auth.updateUser({ password: pw1 });
+  if (error) { sync.msg = error.message; }
+  else { sync.recovery = false; sync.forgotSent = false; sync.msg = 'sync_password_updated'; }
+  render();
+  updateWarn();
+  if (sync.user) pullSafe();
+}
+function isStandalone() {
+  try { return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches; }
+  catch (e) { return false; }
 }
 async function syncAuth(mode, email, password) {
   sync.msg = '';
@@ -1180,6 +1233,12 @@ async function syncAuth(mode, email, password) {
 }
 function viewSync() {
   if (!sbc()) return `<p class="muted">${t('sync_not_config')}</p>`;
+  if (sync.recovery) return `<form class="form" data-form="syncRecovery">
+      <h3>${t('sync_recovery_title')}</h3>
+      <input name="pw1" type="password" autocomplete="new-password" minlength="6" required placeholder="${t('sync_password')}">
+      <input name="pw2" type="password" autocomplete="new-password" minlength="6" required placeholder="${t('sync_password2')}">
+      <button class="primary">${t('sync_set_password')}</button></form>
+    ${sync.msg ? `<p class="muted">${['sync_password_mismatch', 'sync_password_updated'].includes(sync.msg) ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
   if (sync.user) return `<p class="muted">${t('sync_in')}: ${esc(sync.user.email)}</p>
     <p class="muted">${t('sync_last')}: ${sync.updated ? new Date(sync.updated).toLocaleString(locale()) : '—'}</p>
     <div class="acts"><button data-act="syncNow">${t('sync_now')}</button><button class="ghost" data-act="syncOut">${t('sync_out')}</button></div>
@@ -1192,6 +1251,13 @@ function viewSync() {
         <button class="primary" name="mode" value="in" ${sync.busy ? 'disabled' : ''}>${t('sync_login')}</button>
         <button name="mode" value="up" ${sync.busy ? 'disabled' : ''}>${t('sync_signup')}</button>
       </div></form>
+    <div class="acts"><button class="ghost" data-act="google">${t('sync_google')}</button>
+      <button class="ghost" data-act="forgotShow">${t('sync_forgot')}</button></div>
+    ${isStandalone() ? `<p class="muted">${t('sync_standalone_hint')}</p>` : ''}
+    ${sync.forgot ? `<form class="form" data-form="syncForgot">
+      <input name="email" type="email" autocomplete="username" required placeholder="${t('sync_email')}">
+      <button>${t('sync_forgot_send')}</button></form>` : ''}
+    ${sync.forgotSent ? `<p class="muted">${t('sync_forgot_sent')}</p>` : ''}
     ${sync.msg ? `<p class="muted">${sync.msg === 'sync_check_email' ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
 }
 
@@ -1289,7 +1355,9 @@ document.addEventListener('click', (e) => {
       S.fin.pays = (S.fin.pays || []).filter((p) => p.id !== id);
       break;
     case 'syncNow': syncCycle().catch(failSync); return;
-    case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
+    case 'google': syncGoogle(); return;
+    case 'forgotShow': sync.forgot = !sync.forgot; sync.forgotSent = false; render(); return;
+    case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; sync.recovery = false; sync.forgot = false; sync.forgotSent = false; render(); }); return;
     case 'intro': showIntro(); return;
     case 'warnLogin': {
       ui.view = 'settings';
@@ -1359,6 +1427,17 @@ document.addEventListener('submit', (e) => {
 
 document.addEventListener('submit', (e) => {
   const f = e.target;
+  if (f.dataset.form === 'syncForgot') {
+    e.preventDefault();
+    syncForgot(String(new FormData(f).get('email') || '').trim());
+    return;
+  }
+  if (f.dataset.form === 'syncRecovery') {
+    e.preventDefault();
+    const fd = new FormData(f);
+    syncSetPassword(String(fd.get('pw1') || ''), String(fd.get('pw2') || ''));
+    return;
+  }
   if (f.dataset.form !== 'syncAuth') return;
   e.preventDefault();
   const fd = new FormData(f);
