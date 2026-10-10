@@ -105,6 +105,7 @@ Timecon (от time consuming) — планировщик дня, который 
 - PWA: манифест, service worker, работа офлайн, установка на телефон.
 - Supabase — база PostgreSQL, вход по почте и паролю, синхронизация через Realtime.
 - GitHub Pages — бесплатный хостинг с HTTPS.
+- Шрифт — [Clash Grotesk](https://www.fontshare.com/fonts/clash-grotesk) (Fontshare), вшит в приложение.
 - Значки — [Keyline Icons](https://keylineicons.com) (MIT), вшиты в приложение, поэтому грузятся офлайн.
 
 ---
@@ -112,6 +113,8 @@ Timecon (от time consuming) — планировщик дня, который 
 ## Своя копия: установка
 
 Всё бесплатно: Supabase (база и вход) и GitHub Pages (хостинг, HTTPS). Файлы приложения лежат в корне репозитория.
+
+Загружать нужно все файлы, включая папку `fonts/` (шрифт) и иконки `icon-*.png`.
 
 ### Шаг 1. Supabase
 
