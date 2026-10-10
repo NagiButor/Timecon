@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v16';
+const BUILD = 'v17';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -44,6 +44,9 @@ const T = {
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
     sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
     sync_hint: 'Один аккаунт на всех устройствах: введи на каждом ту же почту и пароль. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
+    warn_title: 'Данные не сохраняются',
+    warn_text: 'Ты не вошёл в аккаунт. Задачи, заметки и финансы останутся только на этом устройстве и пропадут, если очистить браузер.',
+    warn_btn: 'Войти',
     d: 'д', h: 'ч',
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
     cat_sport: 'Спорт', cat_work: 'Работа', cat_rest: 'Отдых', cat_study: 'Учёба', cat_home: 'Дом',
@@ -85,6 +88,9 @@ const T = {
     sync_fail: 'Sync error. Check your connection.',
     sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
     sync_hint: 'One account for all devices: enter the same email and password on each. When signing in on a new device, server data replaces local data if the server already has data.',
+    warn_title: 'Data is not being saved',
+    warn_text: 'You are not signed in. Tasks, notes and finances stay only on this device and will be lost if you clear the browser.',
+    warn_btn: 'Sign in',
     d: 'd', h: 'h',
     wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     cat_sport: 'Sport', cat_work: 'Work', cat_rest: 'Rest', cat_study: 'Study', cat_home: 'Home',
@@ -604,7 +610,7 @@ function viewSettings() {
       <h3>${t('intro_show')}</h3>
       <button data-act="intro">${icon('play')} ${t('intro_show')}</button>
     </section>
-    <section class="card"><h3>${t('sync_title')}</h3>${viewSync()}</section>`;
+    <section class="card" id="syncSection"><h3>${t('sync_title')}</h3>${viewSync()}</section>`;
 }
 
 const NOTE_ICONS = ['note', 'note2', 'filetext', 'image', 'pin', 'list', 'clipboard', 'palette', 'star', 'heart', 'book', 'briefcase', 'code', 'music', 'cart', 'home'];
@@ -913,6 +919,19 @@ function render() {
   renderedView = ui.view;
   restoreFields(snap);
   window.scrollTo(0, keepScroll);
+  updateWarn();
+}
+// Предупреждение, пока не выполнен вход: иначе данные живут только на этом устройстве.
+function updateWarn() {
+  const el = $('#warn');
+  if (!el) return;
+  const needLogin = !!sbc() && !sync.user;
+  el.hidden = !needLogin;
+  if (!needLogin) return;
+  el.innerHTML = `<div class="warn-box">
+      <div class="warn-txt"><b>${t('warn_title')}</b><span>${t('warn_text')}</span></div>
+      <button class="primary" data-act="warnLogin">${t('warn_btn')}</button>
+    </div>`;
 }
 
 const SYNC_KEY = 'timecon.sync';
@@ -1033,6 +1052,7 @@ function syncInit() {
     sync.user = session ? session.user : null;
     if (sync.user) { pullSafe(); watchRealtime(); }
     else { stopRealtime(); render(); }
+    updateWarn();
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && sync.user) pullSafe(); });
   window.addEventListener('focus', () => { if (sync.user) pullSafe(); });
@@ -1052,6 +1072,7 @@ async function syncAuth(mode, email, password) {
   else if (mode === 'up' && !data.session) sync.msg = 'sync_check_email';
   else sync.user = data.session ? data.session.user : null;
   render();
+  updateWarn();
   if (sync.user) pullSafe();
 }
 function viewSync() {
@@ -1155,6 +1176,15 @@ document.addEventListener('click', (e) => {
     case 'syncNow': syncCycle().catch(failSync); return;
     case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
     case 'intro': showIntro(); return;
+    case 'warnLogin': {
+      ui.view = 'settings';
+      ui.noteId = null;
+      ui.moveId = null;
+      render();
+      const sec = $('#syncSection');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' });
+      return;
+    }
     case 'export': exportJSON(); return;
     case 'exportCsv': exportCSV(); return;
     default: return;

@@ -175,6 +175,18 @@ label.check input { width: auto; }
 .intro-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 12px 0; }
 .intro-foot button { min-width: 112px; justify-content: center; }
 body.intro-open { overflow: hidden; }
+/* Предупреждение о входе */
+.warn { padding: 8px 12px 0; max-width: 640px; margin: 0 auto; width: 100%; }
+.warn[hidden] { display: none; }
+.warn-box {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--accent); border-left-width: 4px;
+  border-radius: 12px; padding: 10px 12px;
+}
+.warn-txt { flex: 1 1 180px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.warn-txt b { color: var(--accent); font-weight: 600; }
+.warn-txt span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.warn-box button { flex: none; }
 .note-card { cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
 .note-head { display: flex; align-items: center; gap: 10px; }
 .note-ico { color: var(--accent); display: flex; }
