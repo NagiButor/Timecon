@@ -231,3 +231,5 @@ body.intro-open { overflow: hidden; }
 .toolbar .muted { font-size: 12px; }
 .hint { font-size: 12px; margin: 0; }
 .move button { justify-content: center; }
+.mini li.pays-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 6px; align-items: center; }
+.mini li.pays-row input { width: 100%; }

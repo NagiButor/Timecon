@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v20';
+const BUILD = 'v21';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -20,33 +20,34 @@ const CUR = { RUB: '₽', USD: '$', EUR: '€', KZT: '₸', UAH: '₴', BYN: 'Br
 const T = {
   ru: {
     tasks: 'Задачи', stats: 'Статистика', finance: 'Финансы', settings: 'Настройки',
-    today: 'Сегодня', sort: 'Сортировка', sort_manual: 'Как добавлены', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
+    today: 'Сегодня', sort: 'Сортировка', sort_manual: 'По порядку добавления', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
     no_tasks: 'На этот день задач нет', task_title: 'Название задачи', minutes: 'Минут', min: 'мин', category: 'Категория', add: 'Добавить',
     preset_for: 'Пресет на', apply_preset: 'Применить к дню', save_preset: 'Сохранить день как пресет', clear_preset: 'Очистить пресет',
     backlog: 'На потом', to_day: 'На этот день', start: 'Старт', ask_q: 'Время вышло. Задача выполнена?',
     verdict_done: 'Выполнено', verdict_failed: 'Не выполнено', restore: 'Вернуть в работу', move: 'Перенести', ok: 'ОК',
     tomorrow: 'Завтра', after_tomorrow: 'Послезавтра', in_week: 'Через неделю', pick_date: 'Выбрать дату', later: 'На потом',
     delete: 'Удалить', timer_done: 'Время вышло', busy: 'Сначала дождись окончания текущего таймера',
-    cancel: 'Отменить', cancel_confirm: 'Отменить начатую задачу? Отсчёт остановится, и задача вернётся в список невыполненных.',
+    cancel: 'Отменить', cancel_confirm: 'Отменить начатую задачу? Отсчёт остановится, и задачу можно будет запустить заново.',
     period_day: 'День', period_week: 'Неделя', period_month: 'Месяц', period_all: 'Всё время',
-    total_time: 'Время выполненных задач', done_count: 'Выполнено', failed_count: 'Не выполнено', completion: 'Выполнение',
+    total_time: 'Время выполненных задач', done_count: 'Выполнено', failed_count: 'Не выполнено', completion: 'Доля выполненных',
     by_task: 'По задачам', by_cat: 'По категориям', no_data: 'Нет данных', none: 'Пусто',
     income: 'Доходы', expenses: 'Расходы', savings: 'Экономия', efficiency: 'Доля экономии', unneeded: 'Ненужные траты', unneeded_share: 'Доля ненужных',
-    next_payday: 'Следующая зарплата', add_income: 'Добавить доход', add_expense: 'Добавить трату', amount: 'Сумма', date: 'Дата', note: 'Заметка',
+    next_payday: 'Следующая выплата', add_income: 'Добавить доход', add_expense: 'Добавить трату', amount: 'Сумма', date: 'Дата', note: 'Заметка',
     needed: 'Нужная трата', cat_fin: 'Категория', save: 'Сохранить',
     language: 'Язык', theme: 'Тема', dark: 'Тёмная', light: 'Светлая', currency: 'Валюта',
-    pay_days: 'Дни зарплаты (через запятую)', salary: 'Сумма на каждую выплату', shift_weekend: 'Если день выходной, платят раньше (в пятницу)',
+    pay_title: 'Выплаты зарплаты', pay_day: 'Число', pay_amount: 'Сумма', pay_add: 'Добавить выплату', pay_empty: 'Выплаты не настроены',
+    shift_weekend: 'Если выплата выпадает на выходной, переносить её на пятницу',
     categories: 'Категории задач', fin_categories: 'Категории расходов', add_cat: 'Добавить категорию', name: 'Название', data: 'Данные',
-    export_json: 'Экспорт JSON (бэкап)', import_json: 'Импорт JSON', export_csv: 'Экспорт CSV',
-    sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни app/config.js (см. README.md).',
+    export_json: 'Экспорт JSON (резервная копия)', import_json: 'Импорт JSON', export_csv: 'Экспорт CSV',
+    sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни config.js (см. README.md).',
     sync_in: 'Вход выполнен', sync_email: 'Почта', sync_password: 'Пароль (минимум 6 символов)',
     sync_login: 'Войти', sync_signup: 'Регистрация',
     sync_check_email: 'Аккаунт создан. Войди с этой почтой и паролем.',
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
     sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
-    sync_hint: 'Один аккаунт на всех устройствах: введи на каждом ту же почту и пароль. При входе на новом устройстве данные с сервера заменят локальные, если там уже есть данные.',
+    sync_hint: 'Один аккаунт на всех устройствах: введи на каждом ту же почту и пароль. При входе на новом устройстве данные с сервера заменят данные на этом устройстве, если на сервере уже что-то есть.',
     warn_title: 'Данные не сохраняются',
-    warn_text: 'Ты не вошёл в аккаунт. Задачи, заметки и финансы останутся только на этом устройстве и пропадут, если очистить браузер.',
+    warn_text: 'Ты не вошёл в аккаунт. Задачи, заметки и финансы хранятся только на этом устройстве и будут потеряны, если очистить данные браузера.',
     warn_btn: 'Войти',
     d: 'д', h: 'ч',
     wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
@@ -56,42 +57,43 @@ const T = {
     note_add_text: 'Текст', note_add_photo: 'Фото', note_add_code: 'Код', note_updated: 'Изменено',
     note_empty: 'Заметок пока нет. Создай первую.', note_code_lang: 'Язык', note_confirm_del: 'Удалить заметку?',
     note_blocks_hint: 'Блоки идут сверху вниз: текст, фото, код. Добавляй в нужном порядке.',
-    note_photo_fail: 'Не удалось прочитать фото', back: 'Назад', started_at: 'Начало',
+    note_photo_fail: 'Не удалось загрузить фото', back: 'Назад', started_at: 'Начало',
     storage_full: 'Память заполнена. Удали лишние фото из заметок.',
-    auto_start: 'Автозапуск в (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
-    auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если время прошло больше двух часов назад, задача останется обычной.',
+    auto_start: 'Время автозапуска (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
+    auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если указанное время прошло больше двух часов назад, задача сама не запустится.',
     up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
     intro_skip: 'Пропустить', intro_next: 'Далее', intro_start: 'Начать', intro_show: 'Показать обучение',
   },
   en: {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
-    today: 'Today', sort: 'Sort', sort_manual: 'As added', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
+    today: 'Today', sort: 'Sort', sort_manual: 'In added order', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
     no_tasks: 'No tasks for this day', task_title: 'Task title', minutes: 'Minutes', min: 'min', category: 'Category', add: 'Add',
     preset_for: 'Preset for', apply_preset: 'Apply to day', save_preset: 'Save day as preset', clear_preset: 'Clear preset',
     backlog: 'Later', to_day: 'To this day', start: 'Start', ask_q: 'Time is up. Was the task done?',
     verdict_done: 'Done', verdict_failed: 'Not done', restore: 'Back to work', move: 'Move', ok: 'OK',
     tomorrow: 'Tomorrow', after_tomorrow: 'Day after tomorrow', in_week: 'In a week', pick_date: 'Pick a date', later: 'Later',
     delete: 'Delete', timer_done: 'Time is up', busy: 'Wait for the current timer to finish first',
-    cancel: 'Cancel', cancel_confirm: 'Cancel the started task? The countdown stops and the task goes back to the not-done list.',
+    cancel: 'Cancel', cancel_confirm: 'Cancel the started task? The countdown will stop, and you will be able to start the task again.',
     period_day: 'Day', period_week: 'Week', period_month: 'Month', period_all: 'All time',
-    total_time: 'Time on done tasks', done_count: 'Done', failed_count: 'Not done', completion: 'Completion',
+    total_time: 'Time on done tasks', done_count: 'Done', failed_count: 'Not done', completion: 'Completion rate',
     by_task: 'By task', by_cat: 'By category', no_data: 'No data', none: 'Empty',
     income: 'Income', expenses: 'Expenses', savings: 'Savings', efficiency: 'Savings rate', unneeded: 'Unneeded spending', unneeded_share: 'Unneeded share',
-    next_payday: 'Next pay day', add_income: 'Add income', add_expense: 'Add expense', amount: 'Amount', date: 'Date', note: 'Note',
+    next_payday: 'Next payment', add_income: 'Add income', add_expense: 'Add expense', amount: 'Amount', date: 'Date', note: 'Note',
     needed: 'Necessary', cat_fin: 'Category', save: 'Save',
     language: 'Language', theme: 'Theme', dark: 'Dark', light: 'Light', currency: 'Currency',
-    pay_days: 'Pay days (comma separated)', salary: 'Amount per payment', shift_weekend: 'If the day is a weekend, pay is moved earlier (Friday)',
+    pay_title: 'Pay schedule', pay_day: 'Day', pay_amount: 'Amount', pay_add: 'Add payment', pay_empty: 'No payments set',
+    shift_weekend: 'If a pay day falls on a weekend, move it to Friday',
     categories: 'Task categories', fin_categories: 'Expense categories', add_cat: 'Add category', name: 'Name', data: 'Data',
     export_json: 'Export JSON (backup)', import_json: 'Import JSON', export_csv: 'Export CSV',
-    sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in app/config.js (see README.md).',
+    sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in config.js (see README.md).',
     sync_in: 'Signed in', sync_email: 'Email', sync_password: 'Password (min 6 characters)',
     sync_login: 'Sign in', sync_signup: 'Sign up',
     sync_check_email: 'Account created. Sign in with this email and password.',
     sync_fail: 'Sync error. Check your connection.',
     sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
-    sync_hint: 'One account for all devices: enter the same email and password on each. When signing in on a new device, server data replaces local data if the server already has data.',
+    sync_hint: 'One account for all devices: enter the same email and password on each. When signing in on a new device, server data will replace the data on this device if the server already has data.',
     warn_title: 'Data is not being saved',
-    warn_text: 'You are not signed in. Tasks, notes and finances stay only on this device and will be lost if you clear the browser.',
+    warn_text: 'You are not signed in. Tasks, notes and finances are stored only on this device and will be lost if you clear browser data.',
     warn_btn: 'Sign in',
     d: 'd', h: 'h',
     wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
@@ -101,10 +103,10 @@ const T = {
     note_add_text: 'Text', note_add_photo: 'Photo', note_add_code: 'Code', note_updated: 'Updated',
     note_empty: 'No notes yet. Create the first one.', note_code_lang: 'Language', note_confirm_del: 'Delete this note?',
     note_blocks_hint: 'Blocks stack top to bottom: text, photo, code. Add them in any order.',
-    note_photo_fail: 'Could not read the photo', back: 'Back', started_at: 'Started',
+    note_photo_fail: 'Could not load the photo', back: 'Back', started_at: 'Started',
     storage_full: 'Storage is full. Remove some photos from notes.',
-    auto_start: 'Auto-start at (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
-    auto_hint: 'The task starts by itself at the set time when the app is open. If that time was more than two hours ago, it stays a normal task.',
+    auto_start: 'Auto-start time (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
+    auto_hint: 'The task starts by itself at the set time when the app is open. If the set time was more than two hours ago, the task will not start by itself.',
     up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
     intro_skip: 'Skip', intro_next: 'Next', intro_start: 'Start', intro_show: 'Show intro',
   },
@@ -132,7 +134,7 @@ function defaults() {
         { id: 'f_fun', key: 'fcat_fun', icon: 'star' },
         { id: 'f_other', key: 'fcat_other', icon: 'heart' },
       ],
-      incomes: [], expenses: [], payDays: [5, 20], salary: 0, shiftWeekend: true,
+      incomes: [], expenses: [], pays: [{ id: 'p5', day: 5, amount: 0 }, { id: 'p20', day: 20, amount: 0 }], shiftWeekend: true,
     },
   };
 }
@@ -148,6 +150,14 @@ function load() {
 const OLD_COLORS = { '#9ece6a': '#d4af37', '#7aa2f7': '#e0a458', '#e0af68': '#c2a878', '#bb9af7': '#b08968', '#73daca': '#9caf88' };
 function migrate(st) {
   (st.cats || []).forEach((c) => { if (OLD_COLORS[c.color]) c.color = OLD_COLORS[c.color]; });
+  if (!st.fin) st.fin = defaults().fin;
+  if (!Array.isArray(st.fin.pays)) {
+    const days = Array.isArray(st.fin.payDays) ? st.fin.payDays : [];
+    const amount = +st.fin.salary || 0;
+    st.fin.pays = days.filter((d) => d >= 1 && d <= 31).map((d) => ({ id: uid(), day: d, amount }));
+    delete st.fin.payDays;
+    delete st.fin.salary;
+  }
   return reconcileRunning(st);
 }
 let S = load();
@@ -165,6 +175,11 @@ function t(k) { return (T[S.lang] && T[S.lang][k]) ?? T.ru[k] ?? k; }
 function locale() { return S.lang === 'ru' ? 'ru-RU' : 'en-US'; }
 function money(n) { return `${Number(n || 0).toLocaleString(locale(), { maximumFractionDigits: 2 })} ${CUR[S.currency] || S.currency}`; }
 function label(c) { return !c ? '—' : (c.key ? t(c.key) : c.name); }
+// День недели для заголовка пресета: по-русски нужен винительный падеж («на понедельник»).
+function presetDay(wd) {
+  const name = t('wd')[wd];
+  return S.lang === 'ru' ? name.toLowerCase() : name;
+}
 function catById(id) { return S.cats.find((c) => c.id === id); }
 function finCat(id) { return S.fin.cats.find((c) => c.id === id); }
 function fmtDur(min) {
@@ -192,22 +207,24 @@ function monthPaydates(m) {
   const [y, mo] = m.split('-').map(Number);
   const dim = new Date(y, mo, 0).getDate();
   const res = [];
-  for (const d0 of [...new Set(S.fin.payDays)]) {
+  (S.fin.pays || []).forEach((p) => {
+    const d0 = +p.day;
+    if (!(d0 >= 1 && d0 <= 31)) return;
     const date = new Date(y, mo - 1, Math.min(d0, dim));
     if (S.fin.shiftWeekend) {
       const w = date.getDay();
       if (w === 6) date.setDate(date.getDate() - 1);
       else if (w === 0) date.setDate(date.getDate() - 2);
     }
-    res.push(keyOf(date));
-  }
-  return res.filter((k) => monthOf(k) === m).sort();
+    res.push({ key: keyOf(date), amount: +p.amount || 0 });
+  });
+  return res.filter((r) => monthOf(r.key) === m).sort((a, b) => (a.key < b.key ? -1 : 1));
 }
 function nextPayday() {
   const today = keyOf(new Date());
   let m = monthOf(today);
   for (let i = 0; i < 3; i++) {
-    const c = monthPaydates(m).find((k) => k >= today);
+    const c = monthPaydates(m).find((r) => r.key >= today);
     if (c) return c;
     m = shiftMonth(m, 1);
   }
@@ -487,7 +504,7 @@ function viewTasks() {
       <button class="primary">${icon('plus')} ${t('add')}</button>
     </form>
     <section class="card">
-      <h3>${t('preset_for')} ${t('wd')[wd]}</h3>
+      <h3>${t('preset_for')} ${presetDay(wd)}</h3>
       ${preset.length ? `<ul class="mini">${preset.map((p) => `<li>${icon((catById(p.catId) || {}).icon || 'star')}<span>${esc(p.title)}</span><small>${p.minutes} ${t('min')}</small></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
       <div class="acts">
         <button data-act="applyPreset" ${preset.length ? '' : 'disabled'}>${t('apply_preset')}</button>
@@ -541,7 +558,7 @@ function viewStats() {
 
 function viewFinance() {
   const m = ui.month;
-  const salaryTotal = monthPaydates(m).length * (+S.fin.salary || 0);
+  const salaryTotal = sum(monthPaydates(m).map((r) => r.amount));
   const incs = S.fin.incomes.filter((x) => monthOf(x.date) === m);
   const exps = S.fin.expenses.filter((x) => monthOf(x.date) === m);
   const income = salaryTotal + sum(incs.map((x) => +x.amount || 0));
@@ -573,7 +590,7 @@ function viewFinance() {
         <div class="tile"><small>${t('unneeded')}</small><b class="neg">${money(unneeded)}</b></div>
         <div class="tile"><small>${t('unneeded_share')}</small><b class="neg">${unShare}%</b></div>
       </div>
-      ${np ? `<p class="muted">${t('next_payday')}: ${esc(fmtDate(np))}</p>` : ''}
+      ${np ? `<p class="muted">${t('next_payday')}: ${esc(fmtDate(np.key))} · ${money(np.amount)}</p>` : ''}
     </section>
     <section class="card"><h3>${t('by_cat')}</h3>${bars(byCat, money)}</section>
     <form class="card form" data-form="addIncome">
@@ -627,11 +644,17 @@ function viewSettings() {
         <option value="dark" ${S.theme === 'dark' ? 'selected' : ''}>${t('dark')}</option>
         <option value="light" ${S.theme === 'light' ? 'selected' : ''}>${t('light')}</option></select></label>
       <label>${t('currency')}<select name="currency">${Object.keys(CUR).map((c) => `<option value="${c}" ${S.currency === c ? 'selected' : ''}>${c} ${CUR[c]}</option>`).join('')}</select></label>
-      <label>${t('pay_days')}<input name="payDays" value="${S.fin.payDays.join(', ')}"></label>
-      <label>${t('salary')}<input name="salary" type="number" step="0.01" min="0" value="${S.fin.salary}"></label>
-      <label class="check"><input type="checkbox" name="shift" ${S.fin.shiftWeekend ? 'checked' : ''}> ${t('shift_weekend')}</label>
       <button class="primary">${t('save')}</button>
     </form>
+    <section class="card">
+      <h3>${t('pay_title')}</h3>
+      <ul class="mini">${[...S.fin.pays].sort((a, b) => a.day - b.day).map((p) => `<li class="pays-row">
+        <input type="number" min="1" max="31" value="${p.day}" data-change="payDay" data-id="${p.id}" aria-label="${t('pay_day')}">
+        <input type="number" min="0" step="0.01" value="${p.amount}" data-change="payAmount" data-id="${p.id}" aria-label="${t('pay_amount')}">
+        <button class="icon-btn" data-act="payDel" data-id="${p.id}" title="${t('delete')}">${icon('trash')}</button></li>`).join('') || `<li class="empty">${t('pay_empty')}</li>`}</ul>
+      <div class="acts"><button data-act="payAdd">${icon('plus')} ${t('pay_add')}</button></div>
+      <label class="check"><input type="checkbox" data-change="shift" ${S.fin.shiftWeekend ? 'checked' : ''}> ${t('shift_weekend')}</label>
+    </section>
     <p class="muted" style="text-align:center">Timecon ${BUILD}</p>
     <section class="card"><h3>${t('categories')}</h3>${catEditor('cats', S.cats, 'addCat')}</section>
     <section class="card"><h3>${t('fin_categories')}</h3>${catEditor('finCats', S.fin.cats, 'addFinCat')}</section>
@@ -1036,6 +1059,11 @@ function mergeState(local, remote) {
       cats: unionById(local.fin.cats, base.fin.cats),
       incomes: unionById(local.fin.incomes, base.fin.incomes),
       expenses: unionById(local.fin.expenses, base.fin.expenses),
+      pays: (() => {
+        const m = new Map();
+        [...(base.fin.pays || []), ...(local.fin.pays || [])].forEach((p) => m.set(String(p.day), p));
+        return [...m.values()].sort((a, b) => a.day - b.day);
+      })(),
     },
   });
 }
@@ -1232,6 +1260,17 @@ document.addEventListener('click', (e) => {
       else S.fin.cats = S.fin.cats.filter((c) => c.id !== id);
       break;
     }
+    case 'payAdd': {
+      const used = new Set((S.fin.pays || []).map((p) => +p.day));
+      let day = 1;
+      while (day <= 31 && used.has(day)) day++;
+      if (day > 31) return;
+      S.fin.pays.push({ id: uid(), day, amount: 0 });
+      break;
+    }
+    case 'payDel':
+      S.fin.pays = (S.fin.pays || []).filter((p) => p.id !== id);
+      break;
     case 'syncNow': syncCycle().catch(failSync); return;
     case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
     case 'intro': showIntro(); return;
@@ -1295,9 +1334,6 @@ document.addEventListener('submit', (e) => {
       S.lang = fd.get('lang');
       S.theme = fd.get('theme');
       S.currency = fd.get('currency');
-      S.fin.payDays = String(fd.get('payDays') || '').split(/[,\s]+/).map(Number).filter((n) => n >= 1 && n <= 31);
-      S.fin.salary = +fd.get('salary') || 0;
-      S.fin.shiftWeekend = fd.get('shift') === 'on';
       break;
     default: return;
   }
@@ -1363,6 +1399,15 @@ document.addEventListener('scroll', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target;
   if (el.dataset.change === 'sort') { ui.sort = el.value; render(); }
+  if (el.dataset.change === 'shift') { S.fin.shiftWeekend = el.checked; touch(); }
+  if (el.dataset.change === 'payDay' || el.dataset.change === 'payAmount') {
+    const p = (S.fin.pays || []).find((x) => x.id === el.dataset.id);
+    if (p) {
+      if (el.dataset.change === 'payDay') p.day = Math.max(1, Math.min(31, parseInt(el.value, 10) || 1));
+      else p.amount = Math.max(0, +el.value || 0);
+      touch();
+    }
+  }
   if (el.dataset.change === 'notePhoto') { noteAddPhotos([...el.files]); el.value = ''; }
   if (el.dataset.change === 'import') {
     const f = el.files[0];
