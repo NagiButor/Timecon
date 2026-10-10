@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v21';
+const BUILD = 'v22';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -26,7 +26,7 @@ const T = {
     backlog: 'На потом', to_day: 'На этот день', start: 'Старт', ask_q: 'Время вышло. Задача выполнена?',
     verdict_done: 'Выполнено', verdict_failed: 'Не выполнено', restore: 'Вернуть в работу', move: 'Перенести', ok: 'ОК',
     tomorrow: 'Завтра', after_tomorrow: 'Послезавтра', in_week: 'Через неделю', pick_date: 'Выбрать дату', later: 'На потом',
-    delete: 'Удалить', timer_done: 'Время вышло', busy: 'Сначала дождись окончания текущего таймера',
+    delete: 'Удалить', timer_done: 'Время вышло',
     cancel: 'Отменить', cancel_confirm: 'Отменить начатую задачу? Отсчёт остановится, и задачу можно будет запустить заново.',
     period_day: 'День', period_week: 'Неделя', period_month: 'Месяц', period_all: 'Всё время',
     total_time: 'Время выполненных задач', done_count: 'Выполнено', failed_count: 'Не выполнено', completion: 'Доля выполненных',
@@ -72,7 +72,7 @@ const T = {
     backlog: 'Later', to_day: 'To this day', start: 'Start', ask_q: 'Time is up. Was the task done?',
     verdict_done: 'Done', verdict_failed: 'Not done', restore: 'Back to work', move: 'Move', ok: 'OK',
     tomorrow: 'Tomorrow', after_tomorrow: 'Day after tomorrow', in_week: 'In a week', pick_date: 'Pick a date', later: 'Later',
-    delete: 'Delete', timer_done: 'Time is up', busy: 'Wait for the current timer to finish first',
+    delete: 'Delete', timer_done: 'Time is up',
     cancel: 'Cancel', cancel_confirm: 'Cancel the started task? The countdown will stop, and you will be able to start the task again.',
     period_day: 'Day', period_week: 'Week', period_month: 'Month', period_all: 'All time',
     total_time: 'Time on done tasks', done_count: 'Done', failed_count: 'Not done', completion: 'Completion rate',
@@ -266,30 +266,40 @@ function deleteTask(id) {
   if (!f || f.task.status === 'running') return;
   S.days[f.key] = S.days[f.key].filter((x) => x.id !== id);
 }
-function startTask(id, silent) {
-  if (S.running) { if (!silent) alert(t('busy')); return; }
+function runningList() {
+  if (Array.isArray(S.running)) return S.running;
+  return S.running ? [S.running] : [];
+}
+function findRun(id) { return runningList().find((r) => r.taskId === id); }
+function dropRun(id) {
+  S.running = runningList().filter((r) => r.taskId !== id);
+  if (!S.running.length) S.running = null;
+}
+function startTask(id) {
+  if (findRun(id)) return;
   const f = findTask(id);
   if (!f || f.task.status !== 'pending') return;
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
   const startedAt = Date.now();
-  S.running = { taskId: id, endAt: startedAt + f.task.minutes * 60000, startedAt };
+  const list = runningList();
+  list.push({ taskId: id, endAt: startedAt + f.task.minutes * 60000, startedAt });
+  S.running = list;
   f.task.startedAt = startedAt;
   f.task.status = 'running';
   stampT(f.task);
 }
-function finishTimer() {
-  const r = S.running;
-  const f = findTask(r.taskId);
-  S.running = null;
+function finishTimer(run) {
+  const f = findTask(run.taskId);
+  dropRun(run.taskId);
   if (f) { f.task.status = 'ask'; stampT(f.task); }
   alarm(f ? f.task.title : '');
 }
 // Отмена начатой задачи: остановить отсчёт и вернуть задачу в невыполненные.
 function cancelTask(id) {
-  if (!S.running || S.running.taskId !== id) return;
+  if (!findRun(id)) return;
   if (!confirm(t('cancel_confirm'))) return;
   const f = findTask(id);
-  S.running = null;
+  dropRun(id);
   if (f) {
     f.task.status = 'pending';
     f.task.startedAt = null;
@@ -363,13 +373,14 @@ function alarm(title) {
   }
 }
 function tick() {
-  if (S.running) {
-    const left = S.running.endAt - Date.now();
-    if (left <= 0) { finishTimer(); persist(); return; }
-    const el = document.querySelector('[data-timer]');
-    if (el) el.textContent = fmtClock(left);
-    return;
-  }
+  const now = Date.now();
+  let changed = false;
+  runningList().slice().forEach((r) => {
+    if (r.endAt - now <= 0) { finishTimer(r); changed = true; return; }
+    const el = document.querySelector('[data-timer="' + r.taskId + '"]');
+    if (el) el.textContent = fmtClock(r.endAt - now);
+  });
+  if (changed) persist();
   autoStartTick();
 }
 setInterval(tick, 500);
@@ -380,7 +391,8 @@ function autoStartTick() {
   const today = keyOf(new Date());
   const list = S.days[today] || [];
   const now = Date.now();
-  let best = null, bestTs = Infinity;
+  if (S.autoCooldownUntil && now < S.autoCooldownUntil) return;
+  let started = false;
   list.forEach((x) => {
     if (x.status !== 'pending' || !x.startAt || x.autoDone) return;
     const [h, m] = String(x.startAt).split(':').map(Number);
@@ -388,18 +400,17 @@ function autoStartTick() {
     const at = parseKey(today);
     at.setHours(h, m, 0, 0);
     const diff = now - at.getTime();
-    if (diff >= 0 && diff <= AUTO_WINDOW && at.getTime() < bestTs) { best = x; bestTs = at.getTime(); }
+    if (diff < 0 || diff > AUTO_WINDOW) return;
+    const f = findTask(x.id);
+    if (!f || findRun(x.id)) return;
+    startTask(x.id);
+    if (findRun(x.id)) {
+      f.task.autoDone = true;
+      stampT(f.task);
+      started = true;
+    }
   });
-  if (!best) return;
-  if (S.autoCooldownUntil && now < S.autoCooldownUntil) return;
-  const f = findTask(best.id);
-  if (!f || S.running) return;
-  startTask(best.id, true);
-  if (S.running && S.running.taskId === best.id) {
-    f.task.autoDone = true;
-    stampT(f.task);
-  }
-  persist();
+  if (started) persist();
 }
 
 function download(name, text, mime) {
@@ -431,7 +442,7 @@ function taskCard(x, i, total) {
   const c = catById(x.catId) || { icon: 'star', color: '#8b93a7' };
   let body = '';
   if (x.status === 'running') {
-    body = `<span class="clock" data-timer>${fmtClock(S.running.endAt - Date.now())}</span>
+    body = `<span class="clock" data-timer="${x.id}">${fmtClock((findRun(x.id) || { endAt: Date.now() }).endAt - Date.now())}</span>
       <div class="acts center">
         <button class="bad" data-act="cancel" data-id="${x.id}">${icon('x')} ${t('cancel')}</button>
       </div>`;
@@ -445,7 +456,7 @@ function taskCard(x, i, total) {
          <button class="icon-btn" data-act="down" data-id="${x.id}" ${i === total - 1 ? 'disabled' : ''} title="${t('down')}">${icon('right', 'rot-down')}</button>`
       : '';
     body = `<div class="acts">
-      <button class="primary" data-act="start" data-id="${x.id}" ${S.running ? 'disabled' : ''}>${icon('play')} ${t('start')}</button>
+      <button class="primary" data-act="start" data-id="${x.id}">${icon('play')} ${t('start')}</button>
       <button class="icon-btn" data-act="time" data-id="${x.id}" title="${t('auto_on')}">${icon('clock')}</button>
       ${order}
       <button class="icon-btn" data-act="move" data-id="${x.id}" title="${t('move')}">${icon('move')}</button>
@@ -1030,14 +1041,15 @@ function unionNewer(a = [], b = []) {
   });
   return [...m.values()];
 }
-// Если ссылка на запущенный таймер не совпадает со статусом задачи — чистим её.
-// Бывает после объединения данных с двух устройств.
+// Чистим ссылки на запущенные таймеры, которые не совпадают со статусом задач.
+// Бывает после объединения данных с двух устройств. Заодно приводит старый формат к массиву.
 function reconcileRunning(st) {
-  if (!st.running) return st;
-  let found = null;
-  Object.values(st.days || {}).forEach((arr) => (arr || []).forEach((x) => { if (x.id === st.running.taskId) found = x; }));
-  if (!found) (st.backlog || []).forEach((x) => { if (x.id === st.running.taskId) found = x; });
-  if (!found || found.status !== 'running') st.running = null;
+  const list = Array.isArray(st.running) ? st.running : (st.running ? [st.running] : []);
+  const byId = {};
+  Object.values(st.days || {}).forEach((arr) => (arr || []).forEach((x) => { byId[x.id] = x; }));
+  (st.backlog || []).forEach((x) => { byId[x.id] = x; });
+  const kept = list.filter((r) => r && byId[r.taskId] && byId[r.taskId].status === 'running');
+  st.running = kept.length ? kept : null;
   return st;
 }
 function mergeState(local, remote) {
@@ -1052,7 +1064,12 @@ function mergeState(local, remote) {
     days,
     backlog: unionNewer(local.backlog, base.backlog),
     notes: unionNewer(local.notes, base.notes),
-    running: local.running || base.running,
+    running: (() => {
+      const norm = (r) => (Array.isArray(r) ? r : (r ? [r] : []));
+      const m = new Map();
+      [...norm(base.running), ...norm(local.running)].forEach((r) => { if (r && r.taskId) m.set(r.taskId, r); });
+      return [...m.values()];
+    })(),
     fin: {
       ...base.fin,
       ...local.fin,
