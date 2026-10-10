@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v13';
+const BUILD = 'v14';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
