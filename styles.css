@@ -111,6 +111,7 @@ label.check input { width: auto; }
 .mark.bad { color: var(--bad); }
 .mark .ic { width: 24px; height: 24px; }
 .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.acts.center { justify-content: center; }
 .clock { display: block; font-size: 34px; font-variant-numeric: tabular-nums; text-align: center; margin-top: 8px; color: var(--text); }
 .verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .verdict span { width: 100%; color: var(--muted); }

@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v17';
+const BUILD = 'v20';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -27,6 +27,7 @@ const T = {
     verdict_done: 'Выполнено', verdict_failed: 'Не выполнено', restore: 'Вернуть в работу', move: 'Перенести', ok: 'ОК',
     tomorrow: 'Завтра', after_tomorrow: 'Послезавтра', in_week: 'Через неделю', pick_date: 'Выбрать дату', later: 'На потом',
     delete: 'Удалить', timer_done: 'Время вышло', busy: 'Сначала дождись окончания текущего таймера',
+    cancel: 'Отменить', cancel_confirm: 'Отменить начатую задачу? Отсчёт остановится, и задача вернётся в список невыполненных.',
     period_day: 'День', period_week: 'Неделя', period_month: 'Месяц', period_all: 'Всё время',
     total_time: 'Время выполненных задач', done_count: 'Выполнено', failed_count: 'Не выполнено', completion: 'Выполнение',
     by_task: 'По задачам', by_cat: 'По категориям', no_data: 'Нет данных', none: 'Пусто',
@@ -55,11 +56,11 @@ const T = {
     note_add_text: 'Текст', note_add_photo: 'Фото', note_add_code: 'Код', note_updated: 'Изменено',
     note_empty: 'Заметок пока нет. Создай первую.', note_code_lang: 'Язык', note_confirm_del: 'Удалить заметку?',
     note_blocks_hint: 'Блоки идут сверху вниз: текст, фото, код. Добавляй в нужном порядке.',
-    note_photo_fail: 'Не удалось прочитать фото', note_blocks: 'Блоки', back: 'Назад', started_at: 'Начало',
+    note_photo_fail: 'Не удалось прочитать фото', back: 'Назад', started_at: 'Начало',
     storage_full: 'Память заполнена. Удали лишние фото из заметок.',
     auto_start: 'Автозапуск в (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
     auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если время прошло больше двух часов назад, задача останется обычной.',
-    reorder: 'Порядок', up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
+    up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
     intro_skip: 'Пропустить', intro_next: 'Далее', intro_start: 'Начать', intro_show: 'Показать обучение',
   },
   en: {
@@ -71,6 +72,7 @@ const T = {
     verdict_done: 'Done', verdict_failed: 'Not done', restore: 'Back to work', move: 'Move', ok: 'OK',
     tomorrow: 'Tomorrow', after_tomorrow: 'Day after tomorrow', in_week: 'In a week', pick_date: 'Pick a date', later: 'Later',
     delete: 'Delete', timer_done: 'Time is up', busy: 'Wait for the current timer to finish first',
+    cancel: 'Cancel', cancel_confirm: 'Cancel the started task? The countdown stops and the task goes back to the not-done list.',
     period_day: 'Day', period_week: 'Week', period_month: 'Month', period_all: 'All time',
     total_time: 'Time on done tasks', done_count: 'Done', failed_count: 'Not done', completion: 'Completion',
     by_task: 'By task', by_cat: 'By category', no_data: 'No data', none: 'Empty',
@@ -99,11 +101,11 @@ const T = {
     note_add_text: 'Text', note_add_photo: 'Photo', note_add_code: 'Code', note_updated: 'Updated',
     note_empty: 'No notes yet. Create the first one.', note_code_lang: 'Language', note_confirm_del: 'Delete this note?',
     note_blocks_hint: 'Blocks stack top to bottom: text, photo, code. Add them in any order.',
-    note_photo_fail: 'Could not read the photo', note_blocks: 'Blocks', back: 'Back', started_at: 'Started',
+    note_photo_fail: 'Could not read the photo', back: 'Back', started_at: 'Started',
     storage_full: 'Storage is full. Remove some photos from notes.',
     auto_start: 'Auto-start at (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
     auto_hint: 'The task starts by itself at the set time when the app is open. If that time was more than two hours ago, it stays a normal task.',
-    reorder: 'Order', up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
+    up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
     intro_skip: 'Skip', intro_next: 'Next', intro_start: 'Start', intro_show: 'Show intro',
   },
 };
@@ -146,7 +148,7 @@ function load() {
 const OLD_COLORS = { '#9ece6a': '#d4af37', '#7aa2f7': '#e0a458', '#e0af68': '#c2a878', '#bb9af7': '#b08968', '#73daca': '#9caf88' };
 function migrate(st) {
   (st.cats || []).forEach((c) => { if (OLD_COLORS[c.color]) c.color = OLD_COLORS[c.color]; });
-  return st;
+  return reconcileRunning(st);
 }
 let S = load();
 const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false };
@@ -236,8 +238,10 @@ function sortTasks(list) {
   return arr;
 }
 
+function stampT(x) { if (x) x.updatedAt = Date.now(); }
 function addTaskTo(key, task) {
   if (!S.days[key]) S.days[key] = [];
+  if (!task.updatedAt) task.updatedAt = Date.now();
   S.days[key].push(task);
 }
 function deleteTask(id) {
@@ -254,26 +258,43 @@ function startTask(id, silent) {
   S.running = { taskId: id, endAt: startedAt + f.task.minutes * 60000, startedAt };
   f.task.startedAt = startedAt;
   f.task.status = 'running';
+  stampT(f.task);
 }
 function finishTimer() {
   const r = S.running;
   const f = findTask(r.taskId);
   S.running = null;
-  if (f) f.task.status = 'ask';
+  if (f) { f.task.status = 'ask'; stampT(f.task); }
   alarm(f ? f.task.title : '');
+}
+// Отмена начатой задачи: остановить отсчёт и вернуть задачу в невыполненные.
+function cancelTask(id) {
+  if (!S.running || S.running.taskId !== id) return;
+  if (!confirm(t('cancel_confirm'))) return;
+  const f = findTask(id);
+  S.running = null;
+  if (f) {
+    f.task.status = 'pending';
+    f.task.startedAt = null;
+    f.task.autoDone = true;
+    stampT(f.task);
+  }
+  S.autoCooldownUntil = Date.now() + 120000;
+  persist();
 }
 function verdict(id, v) {
   const f = findTask(id);
-  if (f && f.task.status === 'ask') f.task.status = v;
+  if (f && f.task.status === 'ask') { f.task.status = v; stampT(f.task); }
 }
 function setPending(id) {
   const f = findTask(id);
-  if (f) f.task.status = 'pending';
+  if (f) { f.task.status = 'pending'; stampT(f.task); }
 }
 function moveTask(id, when, date) {
   const f = findTask(id);
   if (!f || f.task.status !== 'pending') return;
   S.days[f.key] = S.days[f.key].filter((x) => x.id !== id);
+  stampT(f.task);
   if (when === 'later') { S.backlog.push(f.task); return; }
   const target = when === 'date' ? (date || f.key) : addDays(keyOf(new Date()), +when);
   addTaskTo(target, f.task);
@@ -290,11 +311,13 @@ function setAutoTime(id, value) {
   if (!f) return;
   f.task.startAt = value || null;
   f.task.autoDone = false;
+  stampT(f.task);
 }
 function fromBacklog(id) {
   const x = S.backlog.find((y) => y.id === id);
   if (!x) return;
   S.backlog = S.backlog.filter((y) => y.id !== id);
+  stampT(x);
   addTaskTo(ui.day, x);
 }
 function applyPreset() {
@@ -351,10 +374,14 @@ function autoStartTick() {
     if (diff >= 0 && diff <= AUTO_WINDOW && at.getTime() < bestTs) { best = x; bestTs = at.getTime(); }
   });
   if (!best) return;
+  if (S.autoCooldownUntil && now < S.autoCooldownUntil) return;
   const f = findTask(best.id);
-  if (!f) return;
-  f.task.autoDone = true;
+  if (!f || S.running) return;
   startTask(best.id, true);
+  if (S.running && S.running.taskId === best.id) {
+    f.task.autoDone = true;
+    stampT(f.task);
+  }
   persist();
 }
 
@@ -373,6 +400,13 @@ function exportCSV() {
   Object.entries(S.days).forEach(([k, arr]) => arr.forEach((x) => rows.push(['task', k, x.title, x.minutes, label(catById(x.catId)), x.status])));
   S.fin.incomes.forEach((x) => rows.push(['income', x.date, x.note, x.amount, '', '']));
   S.fin.expenses.forEach((x) => rows.push(['expense', x.date, x.note, x.amount, label(finCat(x.catId)), x.needed ? 'needed' : 'unneeded']));
+  (S.notes || []).forEach((n) => {
+    rows.push(['note', '', n.title || '', (n.blocks || []).length, '', '']);
+    (n.blocks || []).forEach((b) => {
+      if (b.type === 'photo') rows.push(['note_photo', '', '', '', '', '']);
+      else rows.push(['note_' + b.type, '', (b.lang ? '[' + b.lang + '] ' : '') + (b.text || ''), '', '', '']);
+    });
+  });
   download(`timecon-${keyOf(new Date())}.csv`, '\uFEFF' + rows.map((r) => r.map(q).join(',')).join('\n'), 'text/csv');
 }
 
@@ -380,7 +414,10 @@ function taskCard(x, i, total) {
   const c = catById(x.catId) || { icon: 'star', color: '#8b93a7' };
   let body = '';
   if (x.status === 'running') {
-    body = `<span class="clock" data-timer>${fmtClock(S.running.endAt - Date.now())}</span>`;
+    body = `<span class="clock" data-timer>${fmtClock(S.running.endAt - Date.now())}</span>
+      <div class="acts center">
+        <button class="bad" data-act="cancel" data-id="${x.id}">${icon('x')} ${t('cancel')}</button>
+      </div>`;
   } else if (x.status === 'ask') {
     body = `<div class="verdict"><span>${t('ask_q')}</span>
       <button class="ok" data-act="verdict" data-id="${x.id}" data-v="done">${icon('check')} ${t('verdict_done')}</button>
@@ -959,18 +996,39 @@ function unionById(a = [], b = []) {
   [...b, ...a].forEach((x) => m.set(x.id, x));
   return [...m.values()];
 }
+// Объединение, где при совпадении id побеждает более свежая правка (по updatedAt).
+// Нужно, чтобы статус задачи с одного устройства не затирался старой копией с другого.
+function unionNewer(a = [], b = []) {
+  const m = new Map();
+  [...b, ...a].forEach((x) => {
+    const prev = m.get(x.id);
+    if (!prev) { m.set(x.id, x); return; }
+    m.set(x.id, (x.updatedAt || 0) >= (prev.updatedAt || 0) ? x : prev);
+  });
+  return [...m.values()];
+}
+// Если ссылка на запущенный таймер не совпадает со статусом задачи — чистим её.
+// Бывает после объединения данных с двух устройств.
+function reconcileRunning(st) {
+  if (!st.running) return st;
+  let found = null;
+  Object.values(st.days || {}).forEach((arr) => (arr || []).forEach((x) => { if (x.id === st.running.taskId) found = x; }));
+  if (!found) (st.backlog || []).forEach((x) => { if (x.id === st.running.taskId) found = x; });
+  if (!found || found.status !== 'running') st.running = null;
+  return st;
+}
 function mergeState(local, remote) {
   const base = { ...defaults(), ...remote };
   const days = { ...base.days };
-  Object.keys(local.days || {}).forEach((k) => { days[k] = unionById(local.days[k], base.days[k]); });
-  return {
+  Object.keys(local.days || {}).forEach((k) => { days[k] = unionNewer(local.days[k], base.days[k]); });
+  return reconcileRunning({
     ...base,
     lang: local.lang, theme: local.theme, currency: local.currency,
     cats: unionById(local.cats, base.cats),
     presets: { ...base.presets, ...local.presets },
     days,
-    backlog: unionById(local.backlog, base.backlog),
-    notes: unionById(local.notes, base.notes),
+    backlog: unionNewer(local.backlog, base.backlog),
+    notes: unionNewer(local.notes, base.notes),
     running: local.running || base.running,
     fin: {
       ...base.fin,
@@ -979,7 +1037,7 @@ function mergeState(local, remote) {
       incomes: unionById(local.fin.incomes, base.fin.incomes),
       expenses: unionById(local.fin.expenses, base.fin.expenses),
     },
-  };
+  });
 }
 async function uploadNow() {
   const now = Date.now();
@@ -1080,7 +1138,7 @@ function viewSync() {
   if (sync.user) return `<p class="muted">${t('sync_in')}: ${esc(sync.user.email)}</p>
     <p class="muted">${t('sync_last')}: ${sync.updated ? new Date(sync.updated).toLocaleString(locale()) : '—'}</p>
     <div class="acts"><button data-act="syncNow">${t('sync_now')}</button><button class="ghost" data-act="syncOut">${t('sync_out')}</button></div>
-    ${sync.msg ? `<p class="muted">${t(sync.msg)}</p>` : ''}`;
+    ${sync.msg ? `<p class="muted">${sync.msg === 'sync_check_email' || sync.msg === 'sync_fail' ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
   return `<form class="form" data-form="syncAuth">
       <input name="email" type="email" autocomplete="username" required placeholder="${t('sync_email')}">
       <input name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="${t('sync_password')}">
@@ -1154,6 +1212,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'start': startTask(id); break;
+    case 'cancel': cancelTask(id); break;
     case 'verdict': verdict(id, b.dataset.v); break;
     case 'restore': setPending(id); break;
     case 'del': deleteTask(id); break;
@@ -1308,7 +1367,7 @@ document.addEventListener('change', (e) => {
   if (el.dataset.change === 'import') {
     const f = el.files[0];
     if (!f) return;
-    f.text().then((txt) => { S = { ...defaults(), ...JSON.parse(txt) }; persist(); }).catch(() => alert('Import error'));
+    f.text().then((txt) => { S = migrate({ ...defaults(), ...JSON.parse(txt) }); persist(); }).catch(() => alert('Import error'));
   }
 });
 
