@@ -1,5 +1,5 @@
-const CACHE = 'timecon-v15';
-const ASSETS = ['./', 'index.html', 'fonts.css?v=15', 'styles.css?v=15', 'config.js?v=15', 'icons.js?v=15', 'app.js?v=15', 'manifest.webmanifest', 'icon.svg', 'icon-64.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png', 'fonts/clash-grotesk-400.woff2', 'fonts/clash-grotesk-500.woff2', 'fonts/clash-grotesk-600.woff2', 'fonts/clash-grotesk-700.woff2'];
+const CACHE = 'timecon-v16';
+const ASSETS = ['./', 'index.html', 'fonts.css?v=16', 'styles.css?v=16', 'config.js?v=16', 'icons.js?v=16', 'app.js?v=16', 'manifest.webmanifest', 'icon.svg', 'icon-64.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png', 'intro1.jpg', 'intro2.jpg', 'fonts/clash-grotesk-400.woff2', 'fonts/clash-grotesk-500.woff2', 'fonts/clash-grotesk-600.woff2', 'fonts/clash-grotesk-700.woff2'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));

@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v15';
+const BUILD = 'v16';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -57,6 +57,7 @@ const T = {
     auto_start: 'Автозапуск в (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
     auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если время прошло больше двух часов назад, задача останется обычной.',
     reorder: 'Порядок', up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
+    intro_skip: 'Пропустить', intro_next: 'Далее', intro_start: 'Начать', intro_show: 'Показать обучение',
   },
   en: {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
@@ -97,6 +98,7 @@ const T = {
     auto_start: 'Auto-start at (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
     auto_hint: 'The task starts by itself at the set time when the app is open. If that time was more than two hours ago, it stays a normal task.',
     reorder: 'Order', up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
+    intro_skip: 'Skip', intro_next: 'Next', intro_start: 'Start', intro_show: 'Show intro',
   },
 };
 
@@ -597,6 +599,10 @@ function viewSettings() {
         <button data-act="exportCsv">${t('export_csv')}</button>
         <label class="btn-like">${t('import_json')}<input type="file" accept="application/json" data-change="import" hidden></label>
       </div>
+    </section>
+    <section class="card">
+      <h3>${t('intro_show')}</h3>
+      <button data-act="intro">${icon('play')} ${t('intro_show')}</button>
     </section>
     <section class="card"><h3>${t('sync_title')}</h3>${viewSync()}</section>`;
 }
@@ -1148,6 +1154,7 @@ document.addEventListener('click', (e) => {
     }
     case 'syncNow': syncCycle().catch(failSync); return;
     case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; render(); }); return;
+    case 'intro': showIntro(); return;
     case 'export': exportJSON(); return;
     case 'exportCsv': exportCSV(); return;
     default: return;
@@ -1275,6 +1282,82 @@ document.addEventListener('change', (e) => {
   }
 });
 
+// ---- Приветствие при первом запуске (в стиле сторисов) ----
+const INTRO_KEY = 'timecon.intro';
+const INTRO_SLIDES = [
+  { img: 'intro1.jpg', sec: 9 },
+  { img: 'intro2.jpg', sec: 12 },
+];
+const intro = { el: null, i: 0, timer: null };
+function introEl() {
+  if (intro.el) return intro.el;
+  const d = document.createElement('div');
+  d.className = 'intro';
+  d.hidden = true;
+  d.innerHTML = `
+    <div class="intro-bars">${INTRO_SLIDES.map(() => '<i><b></b></i>').join('')}</div>
+    <div class="intro-stage"></div>
+    <div class="intro-foot">
+      <button class="ghost" data-intro="skip">${t('intro_skip')}</button>
+      <button class="primary" data-intro="next">${t('intro_next')}</button>
+    </div>`;
+  d.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-intro]');
+    if (b) {
+      if (b.dataset.intro === 'skip') return introDone();
+      return intro.i >= INTRO_SLIDES.length - 1 ? introDone() : introGo(intro.i + 1);
+    }
+    // Тап по экрану, как в сторисах: левая часть — назад, правая — вперёд.
+    const stage = e.target.closest('.intro-stage');
+    if (!stage) return;
+    const r = stage.getBoundingClientRect();
+    introGo(e.clientX - r.left < r.width * 0.3 ? intro.i - 1 : intro.i + 1);
+  });
+  document.body.appendChild(d);
+  intro.el = d;
+  return d;
+}
+function introGo(i) {
+  if (i < 0) i = 0;
+  if (i >= INTRO_SLIDES.length) return introDone();
+  intro.i = i;
+  const el = introEl();
+  const s = INTRO_SLIDES[i];
+  el.querySelector('.intro-stage').innerHTML = `<img class="intro-img" src="${s.img}" alt="">`;
+  el.querySelectorAll('.intro-bars i').forEach((bar, n) => {
+    const b = bar.querySelector('b');
+    b.style.transition = 'none';
+    b.style.width = n < i ? '100%' : '0%';
+    if (n === i) {
+      b.getBoundingClientRect(); // заставляем браузер применить нулевую ширину
+      b.style.transition = `width ${s.sec}s linear`;
+      b.style.width = '100%';
+    }
+  });
+  el.querySelector('[data-intro="next"]').textContent = i === INTRO_SLIDES.length - 1 ? t('intro_start') : t('intro_next');
+  clearTimeout(intro.timer);
+  intro.timer = setTimeout(() => introGo(i + 1), s.sec * 1000);
+}
+function introDone() {
+  clearTimeout(intro.timer);
+  if (intro.el) intro.el.hidden = true;
+  document.body.classList.remove('intro-open');
+  try { localStorage.setItem(INTRO_KEY, 'done'); } catch (e) { /* приватный режим */ }
+}
+function showIntro() {
+  const el = introEl();
+  el.hidden = false;
+  document.body.classList.add('intro-open');
+  // Тексты кнопок могли смениться вместе с языком
+  el.querySelector('[data-intro="skip"]').textContent = t('intro_skip');
+  introGo(0);
+}
+function introMaybeShow() {
+  try { if (localStorage.getItem(INTRO_KEY) === 'done') return; } catch (e) { /* покажем */ }
+  showIntro();
+}
+
 render();
 syncInit();
+introMaybeShow();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
