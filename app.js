@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v26';
+const BUILD = 'v27';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -25,6 +25,8 @@ const T = {
     today: 'Сегодня', sort: 'Сортировка', sort_manual: 'По порядку добавления', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
     no_tasks: 'На этот день задач нет', task_title: 'Название задачи', minutes: 'Минут', min: 'мин', category: 'Категория', add: 'Добавить',
     preset_for: 'Пресет на', apply_preset: 'Применить к дню', save_preset: 'Сохранить день как пресет', clear_preset: 'Очистить пресет',
+    preset_confirm: 'В этот день уже есть задачи. Применить пресет и добавить ещё?',
+    cat_in_use: 'Категория используется. Удалить её? Записи останутся, но без категории.',
     backlog: 'На потом', to_day: 'На этот день', start: 'Старт', ask_q: 'Время вышло. Задача выполнена?',
     verdict_done: 'Выполнено', verdict_failed: 'Не выполнено', restore: 'Вернуть в работу', move: 'Перенести', ok: 'ОК',
     tomorrow: 'Завтра', after_tomorrow: 'Послезавтра', in_week: 'Через неделю', pick_date: 'Выбрать дату', later: 'На потом',
@@ -77,6 +79,8 @@ const T = {
     today: 'Today', sort: 'Sort', sort_manual: 'In added order', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
     no_tasks: 'No tasks for this day', task_title: 'Task title', minutes: 'Minutes', min: 'min', category: 'Category', add: 'Add',
     preset_for: 'Preset for', apply_preset: 'Apply to day', save_preset: 'Save day as preset', clear_preset: 'Clear preset',
+    preset_confirm: 'This day already has tasks. Apply the preset and add more?',
+    cat_in_use: 'This category is in use. Delete it? The entries will stay but without a category.',
     backlog: 'Later', to_day: 'To this day', start: 'Start', ask_q: 'Time is up. Was the task done?',
     verdict_done: 'Done', verdict_failed: 'Not done', restore: 'Back to work', move: 'Move', ok: 'OK',
     tomorrow: 'Tomorrow', after_tomorrow: 'Day after tomorrow', in_week: 'In a week', pick_date: 'Pick a date', later: 'Later',
@@ -363,6 +367,9 @@ function fromBacklog(id) {
 }
 function applyPreset() {
   const list = S.presets[weekdayOf(ui.day)] || [];
+  if (!list.length) return;
+  const current = S.days[ui.day] || [];
+  if (current.length && !confirm(t('preset_confirm'))) return;
   list.forEach((p) => addTaskTo(ui.day, { id: uid(), title: p.title, minutes: p.minutes, catId: p.catId, status: 'pending', startAt: p.startAt || null }));
 }
 function savePreset() {
@@ -1355,7 +1362,14 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'delCat': {
-      if (b.dataset.kind === 'cats') S.cats = S.cats.filter((c) => c.id !== id);
+      const isTask = b.dataset.kind === 'cats';
+      const used = isTask
+        ? Object.values(S.days).reduce((n, arr) => n + arr.filter((x) => x.catId === id).length, 0)
+          + S.backlog.filter((x) => x.catId === id).length
+          + Object.values(S.presets).reduce((n, arr) => n + arr.filter((p) => p.catId === id).length, 0)
+        : S.fin.expenses.filter((x) => x.catId === id).length;
+      if (used > 0 && !confirm(t('cat_in_use'))) return;
+      if (isTask) S.cats = S.cats.filter((c) => c.id !== id);
       else S.fin.cats = S.fin.cats.filter((c) => c.id !== id);
       break;
     }
