@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v24';
+const BUILD = 'v25';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -48,6 +48,7 @@ const T = {
     sync_forgot_sent: 'Ссылка для сброса пароля отправлена на почту. Проверь и папку «Спам».',
     sync_recovery_title: 'Новый пароль', sync_password2: 'Повтори пароль', sync_set_password: 'Сохранить пароль',
     sync_password_mismatch: 'Пароли не совпадают', sync_password_updated: 'Пароль обновлён. Ты вошёл в аккаунт.',
+    sync_link_expired: 'Ссылка устарела. Запроси сброс пароля заново.',
     sync_standalone_hint: 'Приложение открыто с экрана «Домой»: если вход через Google не возвращает в приложение, войди с почтой и паролем.',
     sync_check_email: 'Аккаунт создан. Войди с этой почтой и паролем.',
     sync_fail: 'Ошибка синхронизации. Проверь интернет.',
@@ -99,6 +100,7 @@ const T = {
     sync_forgot_sent: 'Password reset link sent to your email. Check the spam folder too.',
     sync_recovery_title: 'New password', sync_password2: 'Repeat password', sync_set_password: 'Save password',
     sync_password_mismatch: 'Passwords do not match', sync_password_updated: 'Password updated. You are signed in.',
+    sync_link_expired: 'This link has expired. Request a password reset again.',
     sync_standalone_hint: 'The app is open from the Home Screen: if Google sign-in does not bring you back, sign in with email and password.',
     sync_check_email: 'Account created. Sign in with this email and password.',
     sync_fail: 'Sync error. Check your connection.',
@@ -1053,13 +1055,22 @@ function unionNewer(a = [], b = []) {
   });
   return [...m.values()];
 }
-// Чистим ссылки на запущенные таймеры, которые не совпадают со статусом задач.
-// Бывает после объединения данных с двух устройств. Заодно приводит старый формат к массиву.
+// Чистим зависшие состояния: записи таймеров без задач «running»
+// и задачи «running» без записей таймеров (бывает после объединения
+// данных с двух устройств). Заодно приводит старый формат к массиву.
 function reconcileRunning(st) {
   const list = Array.isArray(st.running) ? st.running : (st.running ? [st.running] : []);
   const byId = {};
   Object.values(st.days || {}).forEach((arr) => (arr || []).forEach((x) => { byId[x.id] = x; }));
   (st.backlog || []).forEach((x) => { byId[x.id] = x; });
+  const hasRun = new Set(list.map((r) => r.taskId));
+  // Задача помечена running, а таймера нет — возвращаем в невыполненные.
+  Object.values(byId).forEach((x) => {
+    if (x && x.status === 'running' && !hasRun.has(x.id)) {
+      x.status = 'pending';
+      x.startedAt = null;
+    }
+  });
   const kept = list.filter((r) => r && byId[r.taskId] && byId[r.taskId].status === 'running');
   st.running = kept.length ? kept : null;
   return st;
@@ -1206,6 +1217,7 @@ async function syncForgot(email) {
 }
 async function syncSetPassword(pw1, pw2) {
   if (pw1 !== pw2) { sync.msg = 'sync_password_mismatch'; render(); return; }
+  if (!sbc() || !sync.user) { sync.msg = 'sync_link_expired'; render(); return; }
   const { error } = await sbc().auth.updateUser({ password: pw1 });
   if (error) { sync.msg = error.message; }
   else { sync.recovery = false; sync.forgotSent = false; sync.msg = 'sync_password_updated'; }
@@ -1240,7 +1252,7 @@ function viewSync() {
       <input name="pw1" type="password" autocomplete="new-password" minlength="6" required placeholder="${t('sync_password')}">
       <input name="pw2" type="password" autocomplete="new-password" minlength="6" required placeholder="${t('sync_password2')}">
       <button class="primary">${t('sync_set_password')}</button></form>
-    ${sync.msg ? `<p class="muted">${['sync_password_mismatch', 'sync_password_updated'].includes(sync.msg) ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
+    ${sync.msg ? `<p class="muted">${['sync_password_mismatch', 'sync_password_updated', 'sync_link_expired'].includes(sync.msg) ? t(sync.msg) : esc(sync.msg)}</p>` : ''}`;
   if (sync.user) return `<p class="muted">${t('sync_in')}: ${esc(sync.user.email)}</p>
     <p class="muted">${t('sync_last')}: ${sync.updated ? new Date(sync.updated).toLocaleString(locale()) : '—'}</p>
     <div class="acts"><button data-act="syncNow">${t('sync_now')}</button><button class="ghost" data-act="syncOut">${t('sync_out')}</button></div>
