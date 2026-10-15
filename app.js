@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v25';
+const BUILD = 'v26';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -363,10 +363,10 @@ function fromBacklog(id) {
 }
 function applyPreset() {
   const list = S.presets[weekdayOf(ui.day)] || [];
-  list.forEach((p) => addTaskTo(ui.day, { id: uid(), title: p.title, minutes: p.minutes, catId: p.catId, status: 'pending' }));
+  list.forEach((p) => addTaskTo(ui.day, { id: uid(), title: p.title, minutes: p.minutes, catId: p.catId, status: 'pending', startAt: p.startAt || null }));
 }
 function savePreset() {
-  S.presets[weekdayOf(ui.day)] = (S.days[ui.day] || []).map((x) => ({ title: x.title, minutes: x.minutes, catId: x.catId }));
+  S.presets[weekdayOf(ui.day)] = (S.days[ui.day] || []).map((x) => ({ title: x.title, minutes: x.minutes, catId: x.catId, startAt: x.startAt || null }));
 }
 
 function alarm(title) {
@@ -530,7 +530,7 @@ function viewTasks() {
     </form>
     <section class="card">
       <h3>${t('preset_for')} ${presetDay(wd)}</h3>
-      ${preset.length ? `<ul class="mini">${preset.map((p) => `<li>${icon((catById(p.catId) || {}).icon || 'star')}<span>${esc(p.title)}</span><small>${p.minutes} ${t('min')}</small></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
+      ${preset.length ? `<ul class="mini">${preset.map((p) => `<li>${icon((catById(p.catId) || {}).icon || 'star')}<span>${esc(p.title)}</span><small>${p.minutes} ${t('min')}${p.startAt ? ` · ${t('auto_at')} ${esc(p.startAt)}` : ''}</small></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
       <div class="acts">
         <button data-act="applyPreset" ${preset.length ? '' : 'disabled'}>${t('apply_preset')}</button>
         <button data-act="savePreset">${t('save_preset')}</button>
@@ -1063,7 +1063,7 @@ function reconcileRunning(st) {
   const byId = {};
   Object.values(st.days || {}).forEach((arr) => (arr || []).forEach((x) => { byId[x.id] = x; }));
   (st.backlog || []).forEach((x) => { byId[x.id] = x; });
-  const hasRun = new Set(list.map((r) => r.taskId));
+  const hasRun = new Set(list.filter((r) => r && r.taskId).map((r) => r.taskId));
   // Задача помечена running, а таймера нет — возвращаем в невыполненные.
   Object.values(byId).forEach((x) => {
     if (x && x.status === 'running' && !hasRun.has(x.id)) {
