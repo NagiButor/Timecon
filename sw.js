@@ -1,5 +1,5 @@
-const CACHE = 'timecon-v28';
-const ASSETS = ['./', 'index.html', 'fonts.css?v=28', 'styles.css?v=28', 'supabase.js?v=28', 'config.js?v=28', 'icons.js?v=28', 'app.js?v=28', 'manifest.webmanifest', 'icon.svg', 'icon-64.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png', 'intro1.jpg', 'intro2.jpg', 'fonts/clash-grotesk-400.woff2', 'fonts/clash-grotesk-500.woff2', 'fonts/clash-grotesk-600.woff2', 'fonts/clash-grotesk-700.woff2'];
+const CACHE = 'timecon-v29';
+const ASSETS = ['./', 'index.html', 'fonts.css?v=29', 'styles.css?v=29', 'supabase.js?v=29', 'config.js?v=29', 'icons.js?v=29', 'app.js?v=29', 'manifest.webmanifest', 'icon.svg', 'icon-64.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png', 'intro1.jpg', 'intro2.jpg', 'fonts/clash-grotesk-400.woff2', 'fonts/clash-grotesk-500.woff2', 'fonts/clash-grotesk-600.woff2', 'fonts/clash-grotesk-700.woff2'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));

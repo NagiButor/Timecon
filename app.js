@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v28';
+const BUILD = 'v29';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -400,6 +400,11 @@ function tick() {
     if (r.endAt - now <= 0) { finishTimer(r); changed = true; return; }
     const el = document.querySelector('[data-timer="' + r.taskId + '"]');
     if (el) el.textContent = fmtClock(r.endAt - now);
+    const bar = document.querySelector('[data-prog="' + r.taskId + '"]');
+    if (bar) {
+      const total = Math.max(1, r.endAt - r.startedAt);
+      bar.style.width = Math.max(0, Math.min(100, (1 - (r.endAt - now) / total) * 100)).toFixed(2) + '%';
+    }
   });
   if (changed) persist();
   autoStartTick();
@@ -463,7 +468,11 @@ function taskCard(x, i, total) {
   const c = catById(x.catId) || { icon: 'star', color: '#8b93a7' };
   let body = '';
   if (x.status === 'running') {
-    body = `<span class="clock" data-timer="${x.id}">${fmtClock((findRun(x.id) || { endAt: Date.now() }).endAt - Date.now())}</span>
+    const run = findRun(x.id) || { endAt: Date.now(), startedAt: Date.now() };
+    const total = Math.max(1, run.endAt - run.startedAt);
+    const done = Math.max(0, Math.min(100, Math.round((1 - (run.endAt - Date.now()) / total) * 100)));
+    body = `<span class="clock" data-timer="${x.id}">${fmtClock(run.endAt - Date.now())}</span>
+      <div class="task-progress"><i data-prog="${x.id}" style="width:${done}%"></i></div>
       <div class="acts center">
         <button class="bad" data-act="cancel" data-id="${x.id}">${icon('x')} ${t('cancel')}</button>
       </div>`;

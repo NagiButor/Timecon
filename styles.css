@@ -65,8 +65,10 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 button {
   font: inherit; color: var(--text); background: var(--card2); border: 1px solid var(--border);
   border-radius: 10px; padding: 8px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
 }
 button:disabled { opacity: .4; }
+button:not(:disabled):active { transform: translateY(1px); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #1a1407; }
 button.ghost { background: transparent; }
 button.ok { color: var(--ok); border-color: var(--ok); }
@@ -96,7 +98,9 @@ label.check input { width: auto; }
 .task {
   background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--c, var(--accent));
   border-radius: 12px; padding: 10px;
+  transition: border-color .2s ease, background-color .2s ease;
 }
+.task.running { border-color: var(--accent); }
 .task-head { display: flex; align-items: center; gap: 10px; }
 .cat-ico { color: var(--c, var(--accent)); display: flex; }
 .task-title { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -113,6 +117,8 @@ label.check input { width: auto; }
 .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .acts.center { justify-content: center; }
 .clock { display: block; font-size: 34px; font-variant-numeric: tabular-nums; text-align: center; margin-top: 8px; color: var(--text); }
+.task-progress { height: 4px; background: var(--card2); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.task-progress i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width .5s linear; }
 .verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .verdict span { width: 100%; color: var(--muted); }
 .move { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 8px; }
@@ -155,8 +161,10 @@ label.check input { width: auto; }
 .tabbar button {
   flex-direction: column; background: none; border: 0; color: var(--muted); font-size: 11px;
   justify-content: center; gap: 2px; padding: 6px 2px;
+  transition: color .15s ease;
 }
 .tabbar button.on { color: var(--accent); }
+.tabbar button:active { transform: none; }
 .daybar button.icon-btn { padding: 6px 10px; }
 .ic.rot-up { transform: rotate(-90deg); }
 .ic.rot-down { transform: rotate(90deg); }
@@ -188,7 +196,8 @@ body.intro-open { overflow: hidden; }
 .warn-txt b { color: var(--accent); font-weight: 600; }
 .warn-txt span { color: var(--muted); font-size: 13px; line-height: 1.35; }
 .warn-box button { flex: none; }
-.note-card { cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.note-card { cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: background-color .15s ease, border-color .15s ease; }
+.note-card:active { background: var(--card2); border-color: var(--accent); }
 .note-head { display: flex; align-items: center; gap: 10px; }
 .note-ico { color: var(--accent); display: flex; }
 .note-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
