@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v29';
+const BUILD = 'v30';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -24,7 +24,11 @@ const T = {
     tasks: 'Задачи', stats: 'Статистика', finance: 'Финансы', settings: 'Настройки',
     today: 'Сегодня', sort: 'Сортировка', sort_manual: 'По порядку добавления', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
     no_tasks: 'На этот день задач нет', task_title: 'Название задачи', minutes: 'Минут', min: 'мин', category: 'Категория', add: 'Добавить',
-    preset_for: 'Пресет на', apply_preset: 'Применить к дню', save_preset: 'Сохранить день как пресет', clear_preset: 'Очистить пресет',
+    apply_preset: 'Применить', save_preset: 'Сохранить день как пресет', clear_preset: 'Удалить пресет',
+    presets: 'Пресеты по дням недели', presets_empty: 'Пресеты не сохранены. Настрой день и нажми «Сохранить день как пресет».',
+    preset_hint: 'Пресет любого дня можно применить к текущему дню кнопкой «Применить».',
+    preset_clear_confirm: 'Удалить этот пресет?',
+    mark_done: 'Готово', mark_done_hint: 'Отметить сделанной без таймера', manual_mark: 'без таймера',
     preset_confirm: 'В этот день уже есть задачи. Применить пресет и добавить ещё?',
     cat_in_use: 'Категория используется. Удалить её? Записи останутся, но без категории.',
     backlog: 'На потом', to_day: 'На этот день', start: 'Старт', ask_q: 'Время вышло. Задача выполнена?',
@@ -78,7 +82,11 @@ const T = {
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
     today: 'Today', sort: 'Sort', sort_manual: 'In added order', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
     no_tasks: 'No tasks for this day', task_title: 'Task title', minutes: 'Minutes', min: 'min', category: 'Category', add: 'Add',
-    preset_for: 'Preset for', apply_preset: 'Apply to day', save_preset: 'Save day as preset', clear_preset: 'Clear preset',
+    apply_preset: 'Apply', save_preset: 'Save day as preset', clear_preset: 'Delete preset',
+    presets: 'Presets by weekday', presets_empty: 'No presets saved. Set up a day and tap "Save day as preset".',
+    preset_hint: 'Any weekday preset can be applied to the current day with the "Apply" button.',
+    preset_clear_confirm: 'Delete this preset?',
+    mark_done: 'Done', mark_done_hint: 'Mark as done without a timer', manual_mark: 'no timer',
     preset_confirm: 'This day already has tasks. Apply the preset and add more?',
     cat_in_use: 'This category is in use. Delete it? The entries will stay but without a category.',
     backlog: 'Later', to_day: 'To this day', start: 'Start', ask_q: 'Time is up. Was the task done?',
@@ -193,11 +201,6 @@ function t(k) { return (T[S.lang] && T[S.lang][k]) ?? T.ru[k] ?? k; }
 function locale() { return S.lang === 'ru' ? 'ru-RU' : 'en-US'; }
 function money(n) { return `${Number(n || 0).toLocaleString(locale(), { maximumFractionDigits: 2 })} ${CUR[S.currency] || S.currency}`; }
 function label(c) { return !c ? '—' : (c.key ? t(c.key) : c.name); }
-// День недели для заголовка пресета: по-русски нужен винительный падеж («на понедельник»).
-function presetDay(wd) {
-  const name = t('wd')[wd];
-  return S.lang === 'ru' ? name.toLowerCase() : name;
-}
 function catById(id) { return S.cats.find((c) => c.id === id); }
 function finCat(id) { return S.fin.cats.find((c) => c.id === id); }
 function fmtDur(min) {
@@ -365,15 +368,30 @@ function fromBacklog(id) {
   stampT(x);
   addTaskTo(ui.day, x);
 }
-function applyPreset() {
-  const list = S.presets[weekdayOf(ui.day)] || [];
+function applyPreset(wd) {
+  const day = wd === undefined || wd === null ? weekdayOf(ui.day) : Number(wd);
+  const list = S.presets[day] || [];
   if (!list.length) return;
   const current = S.days[ui.day] || [];
   if (current.length && !confirm(t('preset_confirm'))) return;
   list.forEach((p) => addTaskTo(ui.day, { id: uid(), title: p.title, minutes: p.minutes, catId: p.catId, status: 'pending', startAt: p.startAt || null }));
 }
+function clearPreset(wd) {
+  if (!confirm(t('preset_clear_confirm'))) return;
+  delete S.presets[wd];
+}
 function savePreset() {
   S.presets[weekdayOf(ui.day)] = (S.days[ui.day] || []).map((x) => ({ title: x.title, minutes: x.minutes, catId: x.catId, startAt: x.startAt || null }));
+}
+// Задача выполнена без таймера: отмечаем сделанной, время берём из плана.
+function finishNow(id) {
+  const f = findTask(id);
+  if (!f || f.task.status !== 'pending') return;
+  dropRun(id);
+  f.task.status = 'done';
+  f.task.startedAt = null;
+  f.task.manual = true;
+  stampT(f.task);
 }
 
 function alarm(title) {
@@ -487,6 +505,7 @@ function taskCard(x, i, total) {
       : '';
     body = `<div class="acts">
       <button class="primary" data-act="start" data-id="${x.id}">${icon('play')} ${t('start')}</button>
+      <button class="ok" data-act="finishNow" data-id="${x.id}" title="${t('mark_done_hint')}">${icon('check')} ${t('mark_done')}</button>
       <button class="icon-btn" data-act="time" data-id="${x.id}" title="${t('auto_on')}">${icon('clock')}</button>
       ${order}
       <button class="icon-btn" data-act="move" data-id="${x.id}" title="${t('move')}">${icon('move')}</button>
@@ -510,16 +529,37 @@ function taskCard(x, i, total) {
       <button class="primary" type="submit">${t('ok')}</button>
       <button class="ghost" type="button" data-act="timeClear" data-id="${x.id}">${t('auto_off')}</button></form>` : '';
   const auto = x.startAt ? ` · ${t('auto_at')} ${esc(x.startAt)}` : '';
+  const manual = x.manual && x.status === 'done' ? ` · ${t('manual_mark')}` : '';
   return `<li class="task ${x.status}" style="--c:${c.color}">
     <div class="task-head"><span class="cat-ico">${icon(c.icon)}</span>
-      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${auto}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}</small></div>${mark}</div>
+      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${auto}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}${manual}</small></div>${mark}</div>
     ${body}${moveForm}${timeForm}</li>`;
+}
+
+function viewPresets() {
+  const wd = weekdayOf(ui.day);
+  const days = [1, 2, 3, 4, 5, 6, 0].filter((d) => (S.presets[d] || []).length);
+  const todayHas = (S.presets[wd] || []).length > 0;
+  return `<section class="card">
+      <h3>${t('presets')}</h3>
+      ${days.length ? days.map((d) => `<div class="preset">
+        <div class="preset-head">
+          <b>${t('wd')[d]}</b>
+          <button class="ghost" data-act="applyPreset" data-wd="${d}">${t('apply_preset')}</button>
+          <button class="icon-btn" data-act="clearPreset" data-wd="${d}" title="${t('clear_preset')}">${icon('trash')}</button>
+        </div>
+        <ul class="mini">${(S.presets[d] || []).map((p) => `<li>${icon((catById(p.catId) || {}).icon || 'star')}<span>${esc(p.title)}</span><small>${p.minutes} ${t('min')}${p.startAt ? ` · ${t('auto_at')} ${esc(p.startAt)}` : ''}</small></li>`).join('')}</ul>
+      </div>`).join('') : `<p class="empty">${t('presets_empty')}</p>`}
+      <div class="acts">
+        <button data-act="savePreset">${icon('plus')} ${t('save_preset')}</button>
+      </div>
+      <p class="muted hint">${t('preset_hint')}</p>
+    </section>`;
 }
 
 function viewTasks() {
   const list = sortTasks(S.days[ui.day] || []);
   const wd = weekdayOf(ui.day);
-  const preset = S.presets[wd] || [];
   const sorts = [['manual', 'sort_manual'], ['cat', 'sort_cat'], ['status', 'sort_status'], ['time', 'sort_time']];
   return `
     <div class="card daybar">
@@ -544,15 +584,7 @@ function viewTasks() {
       <p class="muted hint">${t('auto_hint')}</p>
       <button class="primary">${icon('plus')} ${t('add')}</button>
     </form>
-    <section class="card">
-      <h3>${t('preset_for')} ${presetDay(wd)}</h3>
-      ${preset.length ? `<ul class="mini">${preset.map((p) => `<li>${icon((catById(p.catId) || {}).icon || 'star')}<span>${esc(p.title)}</span><small>${p.minutes} ${t('min')}${p.startAt ? ` · ${t('auto_at')} ${esc(p.startAt)}` : ''}</small></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
-      <div class="acts">
-        <button data-act="applyPreset" ${preset.length ? '' : 'disabled'}>${t('apply_preset')}</button>
-        <button data-act="savePreset">${t('save_preset')}</button>
-        <button class="ghost" data-act="clearPreset" ${preset.length ? '' : 'disabled'}>${t('clear_preset')}</button>
-      </div>
-    </section>
+    ${viewPresets()}
     <section class="card">
       <h3>${t('backlog')}</h3>
       ${S.backlog.length ? `<ul class="mini">${S.backlog.map((x) => `<li>${icon((catById(x.catId) || {}).icon || 'star')}<span>${esc(x.title)}</span>
@@ -1397,6 +1429,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'start': startTask(id); break;
+    case 'finishNow': finishNow(id); break;
     case 'cancel': cancelTask(id); break;
     case 'verdict': verdict(id, b.dataset.v); break;
     case 'restore': setPending(id); break;
@@ -1404,9 +1437,9 @@ document.addEventListener('click', (e) => {
     case 'move': ui.moveId = ui.moveId === id ? null : id; break;
     case 'fromBacklog': fromBacklog(id); break;
     case 'delBacklog': S.backlog = S.backlog.filter((x) => x.id !== id); break;
-    case 'applyPreset': applyPreset(); break;
+    case 'applyPreset': applyPreset(b.dataset.wd); break;
     case 'savePreset': savePreset(); break;
-    case 'clearPreset': delete S.presets[weekdayOf(ui.day)]; break;
+    case 'clearPreset': clearPreset(+b.dataset.wd); break;
     case 'delFin': {
       const key = b.dataset.kind === 'income' ? 'incomes' : 'expenses';
       S.fin[key] = S.fin[key].filter((x) => x.id !== id);

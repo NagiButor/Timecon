@@ -256,3 +256,9 @@ body.intro-open { overflow: hidden; }
 .btn-link:active { color: var(--text); }
 .mini li.pays-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 6px; align-items: center; }
 .mini li.pays-row input { width: 100%; }
+/* Список пресетов по дням недели */
+.preset { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+.preset:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.preset-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.preset-head b { flex: 1; min-width: 0; font-weight: 600; }
+.preset-head button { flex: none; }
