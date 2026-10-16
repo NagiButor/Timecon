@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v30';
+const BUILD = 'v31';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -21,6 +21,7 @@ const CUR = { RUB: '₽', USD: '$', EUR: '€', KZT: '₸', UAH: '₴', BYN: 'Br
 
 const T = {
   ru: {
+    more_actions: 'Ещё', new_task: 'Добавить задачу', empty_title: 'С чего начнём день?', empty_hint: 'Добавь первую задачу или примени сохранённый пресет.', planned: 'по плану', of: 'из', tasks_done: 'задач выполнено', focus: 'В фокусе', day_plan: 'План дня', more: 'Дополнительно', close: 'Закрыть', balance: 'Баланс за месяц', details: 'Подробности', expense_short: 'Расход', income_short: 'Доход', transactions: 'Операции', no_transactions: 'Здесь появится история операций', empty_finance: 'Добавь первую операцию, чтобы увидеть картину месяца.', local_data: 'Данные на этом устройстве', enable_sync: 'Синхронизация', storage_info: 'О хранении данных', focus_timer: 'Выделить таймер', remaining: 'Осталось', previous_day: 'Предыдущий день', next_day: 'Следующий день', previous_month: 'Предыдущий месяц', next_month: 'Следующий месяц', task_added: 'Задача добавлена', entry_added: 'Операция добавлена',
     tasks: 'Задачи', stats: 'Статистика', finance: 'Финансы', settings: 'Настройки',
     today: 'Сегодня', sort: 'Сортировка', sort_manual: 'По порядку добавления', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
     no_tasks: 'На этот день задач нет', task_title: 'Название задачи', minutes: 'Минут', min: 'мин', category: 'Категория', add: 'Добавить',
@@ -79,6 +80,7 @@ const T = {
     intro_skip: 'Пропустить', intro_next: 'Далее', intro_start: 'Начать', intro_show: 'Показать обучение',
   },
   en: {
+    more_actions: 'More', new_task: 'Add task', empty_title: 'Where shall we start?', empty_hint: 'Add your first task or apply a saved preset.', planned: 'planned', of: 'of', tasks_done: 'tasks completed', focus: 'In focus', day_plan: 'Day plan', more: 'More options', close: 'Close', balance: 'Monthly balance', details: 'Details', expense_short: 'Expense', income_short: 'Income', transactions: 'Transactions', no_transactions: 'Your transactions will appear here', empty_finance: 'Add your first transaction to see your month at a glance.', local_data: 'Data on this device', enable_sync: 'Enable sync', storage_info: 'About data storage', focus_timer: 'Focus this timer', remaining: 'Remaining', previous_day: 'Previous day', next_day: 'Next day', previous_month: 'Previous month', next_month: 'Next month', task_added: 'Task added', entry_added: 'Transaction added',
     tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
     today: 'Today', sort: 'Sort', sort_manual: 'In added order', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
     no_tasks: 'No tasks for this day', task_title: 'Task title', minutes: 'Minutes', min: 'min', category: 'Category', add: 'Add',
@@ -187,7 +189,7 @@ function migrate(st) {
   return reconcileRunning(st);
 }
 let S = load();
-const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false };
+const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false, focusTask: null, actionsId: null };
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -421,7 +423,7 @@ function tick() {
     const bar = document.querySelector('[data-prog="' + r.taskId + '"]');
     if (bar) {
       const total = Math.max(1, r.endAt - r.startedAt);
-      bar.style.width = Math.max(0, Math.min(100, (1 - (r.endAt - now) / total) * 100)).toFixed(2) + '%';
+      bar.style.width = Math.max(0, Math.min(100, (r.endAt - now) / total * 100)).toFixed(2) + '%';
     }
   });
   if (changed) persist();
@@ -482,14 +484,14 @@ function exportCSV() {
   download(`timecon-${keyOf(new Date())}.csv`, '\uFEFF' + rows.map((r) => r.map(q).join(',')).join('\n'), 'text/csv');
 }
 
-function taskCard(x, i, total) {
+function taskCard(x, i, total, focused = false) {
   const c = catById(x.catId) || { icon: 'star', color: '#8b93a7' };
   let body = '';
   if (x.status === 'running') {
     const run = findRun(x.id) || { endAt: Date.now(), startedAt: Date.now() };
     const total = Math.max(1, run.endAt - run.startedAt);
-    const done = Math.max(0, Math.min(100, Math.round((1 - (run.endAt - Date.now()) / total) * 100)));
-    body = `<span class="clock" data-timer="${x.id}">${fmtClock(run.endAt - Date.now())}</span>
+    const done = Math.max(0, Math.min(100, Math.round((run.endAt - Date.now()) / total * 100)));
+    body = `<div class="timer-label">${t('remaining')}</div><span class="clock" data-timer="${x.id}">${fmtClock(run.endAt - Date.now())}</span>
       <div class="task-progress"><i data-prog="${x.id}" style="width:${done}%"></i></div>
       <div class="acts center">
         <button class="bad" data-act="cancel" data-id="${x.id}">${icon('x')} ${t('cancel')}</button>
@@ -500,16 +502,16 @@ function taskCard(x, i, total) {
       <button class="bad" data-act="verdict" data-id="${x.id}" data-v="failed">${icon('x')} ${t('verdict_failed')}</button></div>`;
   } else if (x.status === 'pending') {
     const order = ui.sort === 'manual'
-      ? `<button class="icon-btn" data-act="up" data-id="${x.id}" ${i === 0 ? 'disabled' : ''} title="${t('up')}">${icon('right', 'rot-up')}</button>
-         <button class="icon-btn" data-act="down" data-id="${x.id}" ${i === total - 1 ? 'disabled' : ''} title="${t('down')}">${icon('right', 'rot-down')}</button>`
-      : '';
-    body = `<div class="acts">
+      ? `<button type="button" data-act="up" data-id="${x.id}" ${i === 0 ? 'disabled' : ''}>${icon('right', 'rot-up')} ${t('up')}</button><button type="button" data-act="down" data-id="${x.id}" ${i === total - 1 ? 'disabled' : ''}>${icon('right', 'rot-down')} ${t('down')}</button>` : '';
+    body = `<div class="acts task-primary-actions">
       <button class="primary" data-act="start" data-id="${x.id}">${icon('play')} ${t('start')}</button>
       <button class="ok" data-act="finishNow" data-id="${x.id}" title="${t('mark_done_hint')}">${icon('check')} ${t('mark_done')}</button>
-      <button class="icon-btn" data-act="time" data-id="${x.id}" title="${t('auto_on')}">${icon('clock')}</button>
-      ${order}
-      <button class="icon-btn" data-act="move" data-id="${x.id}" title="${t('move')}">${icon('move')}</button>
-      <button class="icon-btn" data-act="del" data-id="${x.id}" title="${t('delete')}">${icon('trash')}</button></div>`;
+      <button type="button" class="ghost task-more-toggle" data-act="taskMore" data-id="${x.id}" aria-expanded="${ui.actionsId === x.id}" aria-controls="actions-${x.id}">${t('more_actions')} <span aria-hidden="true">⋯</span></button></div>
+      ${ui.actionsId === x.id ? `<div class="secondary-actions" id="actions-${x.id}">
+        <button type="button" data-act="time" data-id="${x.id}">${icon('clock')} ${t('auto_on')}</button>${order}
+        <button type="button" data-act="move" data-id="${x.id}">${icon('move')} ${t('move')}</button>
+        <button type="button" data-act="del" data-id="${x.id}">${icon('trash')} ${t('delete')}</button>
+      </div>` : ''}`;
   } else {
     body = `<div class="acts">
       <button class="icon-btn" data-act="restore" data-id="${x.id}" title="${t('restore')}">${icon('undo')}</button>
@@ -530,9 +532,9 @@ function taskCard(x, i, total) {
       <button class="ghost" type="button" data-act="timeClear" data-id="${x.id}">${t('auto_off')}</button></form>` : '';
   const auto = x.startAt ? ` · ${t('auto_at')} ${esc(x.startAt)}` : '';
   const manual = x.manual && x.status === 'done' ? ` · ${t('manual_mark')}` : '';
-  return `<li class="task ${x.status}" style="--c:${c.color}">
+  return `<li data-task-id="${x.id}" data-status="${x.status}" class="task ${x.status} ${focused ? 'focused' : ''}" style="--c:${c.color}">
     <div class="task-head"><span class="cat-ico">${icon(c.icon)}</span>
-      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${auto}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}${manual}</small></div>${mark}</div>
+      <div class="task-title"><span class="ttl">${esc(x.title)}</span><small>${x.minutes} ${t('min')}${auto}${x.startedAt ? ` · ${t('started_at')} ${fmtTime(x.startedAt)}` : ''}${manual}</small></div>${mark}${x.status === 'running' ? `<button class="icon-btn ghost focus-select" data-act="focusTimer" data-id="${x.id}" aria-label="${t('focus_timer')}" aria-pressed="${focused}">${icon('clock')}</button>` : ''}</div>
     ${body}${moveForm}${timeForm}</li>`;
 }
 
@@ -559,38 +561,30 @@ function viewPresets() {
 
 function viewTasks() {
   const list = sortTasks(S.days[ui.day] || []);
-  const wd = weekdayOf(ui.day);
+  const active = list.filter((x) => ['running', 'ask'].includes(x.status));
+  const rest = list.filter((x) => !['running', 'ask'].includes(x.status));
+  const focusId = active.some((x) => x.id === ui.focusTask) ? ui.focusTask : (active[0] || {}).id;
+  const completed = list.filter((x) => x.status === 'done').length;
   const sorts = [['manual', 'sort_manual'], ['cat', 'sort_cat'], ['status', 'sort_status'], ['time', 'sort_time']];
+  const isToday = ui.day === keyOf(new Date());
+  const heading = isToday ? t('today') : parseKey(ui.day).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
+  const card = (x) => taskCard(x, list.indexOf(x), list.length, x.id === focusId);
   return `
-    <div class="card daybar">
-      <button class="icon-btn" data-act="day" data-n="-1">${icon('left')}</button>
-      <div class="daylabel"><b>${esc(fmtDate(ui.day))}</b><small>${t('wd')[wd]}</small></div>
-      <button class="icon-btn" data-act="day" data-n="1">${icon('right')}</button>
-    </div>
-    <div class="toolbar">
-      <button class="ghost" data-act="today">${t('today')}</button>
-      <label>${t('sort')}
-        <select data-change="sort">${sorts.map(([v, k]) => `<option value="${v}" ${ui.sort === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select>
-      </label>
-    </div>
-    <ul class="tasks">${list.length ? list.map((x, i) => taskCard(x, i, list.length)).join('') : `<li class="empty">${t('no_tasks')}</li>`}</ul>
-    <form class="card form" data-form="addTask">
-      <input name="title" placeholder="${t('task_title')}" required maxlength="80">
-      <div class="row2">
-        <label>${t('minutes')}<input name="minutes" type="number" min="1" max="600" value="25"></label>
-        <label>${t('category')}<select name="cat">${S.cats.map((c) => `<option value="${c.id}">${esc(label(c))}</option>`).join('')}</select></label>
-      </div>
-      <label>${t('auto_start')}<input name="startAt" type="time"></label>
-      <p class="muted hint">${t('auto_hint')}</p>
-      <button class="primary">${icon('plus')} ${t('add')}</button>
-    </form>
-    ${viewPresets()}
-    <section class="card">
-      <h3>${t('backlog')}</h3>
-      ${S.backlog.length ? `<ul class="mini">${S.backlog.map((x) => `<li>${icon((catById(x.catId) || {}).icon || 'star')}<span>${esc(x.title)}</span>
-        <button class="ghost" data-act="fromBacklog" data-id="${x.id}">${icon('move')} ${t('to_day')}</button>
-        <button class="icon-btn" data-act="delBacklog" data-id="${x.id}">${icon('trash')}</button></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
-    </section>`;
+    <section class="day-hero">
+      <div class="day-heading"><div><p class="eyebrow">${esc(t('wd')[weekdayOf(ui.day)])} · ${esc(parseKey(ui.day).toLocaleDateString(locale(), {day:'numeric',month:'long'}))}</p>
+        <h2>${esc(heading)}</h2></div>
+        <div class="day-arrows"><button class="icon-btn ghost" data-act="day" data-n="-1" aria-label="${t('previous_day')}">${icon('left')}</button>
+        <button class="icon-btn ghost" data-act="day" data-n="1" aria-label="${t('next_day')}">${icon('right')}</button></div></div>
+      ${list.length ? `<p class="day-summary"><b>${completed}</b> ${t('of')} ${list.length} ${t('tasks_done')}<span>·</span>${fmtDur(sum(list.map((x) => +x.minutes || 0)))} ${t('planned')}</p>` : ''}
+    </section>
+    ${active.length ? `<div class="section-label"><span class="live-dot"></span>${t('focus')}<small>${active.length}</small></div><ul class="tasks focus-list">${active.map(card).join('')}</ul>` : ''}
+    ${rest.length ? `<div class="toolbar plan-toolbar"><h3>${t('day_plan')}</h3><label><span class="sr-only">${t('sort')}</span><select aria-label="${t('sort')}" data-change="sort">${sorts.map(([v,k]) => `<option value="${v}" ${ui.sort === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></label></div>` : ''}
+    ${rest.length ? `<ul class="tasks">${rest.map(card).join('')}</ul>` : !list.length ? `<section class="empty-day"><span class="empty-symbol">${icon('tasks')}</span><h3>${t('empty_title')}</h3><p>${t('empty_hint')}</p></section>` : ''}
+    <div class="day-actions"><button class="primary add-task" data-act="openSheet" data-sheet="addTask">${icon('plus')} ${t('new_task')}</button>${!isToday ? `<button class="ghost" data-act="today">${t('today')}</button>` : ''}</div>
+    <details class="quiet-section" data-disclosure="presets"><summary>${t('presets')}<span>${Object.values(S.presets).filter((a) => a.length).length}</span></summary>${viewPresets()}</details>
+    <details class="quiet-section" data-disclosure="backlog"><summary>${t('backlog')}<span>${S.backlog.length}</span></summary>
+      ${S.backlog.length ? `<ul class="mini">${S.backlog.map((x) => `<li>${icon((catById(x.catId) || {}).icon || 'star')}<span>${esc(x.title)}</span><button class="ghost" data-act="fromBacklog" data-id="${x.id}">${t('to_day')}</button><button class="icon-btn" data-act="delBacklog" data-id="${x.id}" aria-label="${t('delete')}">${icon('trash')}</button></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
+    </details>`;
 }
 
 function periodPred() {
@@ -650,48 +644,28 @@ function viewFinance() {
   const monthLabel = new Date(+m.slice(0, 4), +m.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
   return `
     <div class="card daybar">
-      <button class="icon-btn" data-act="month" data-n="-1">${icon('left')}</button>
+      <button class="icon-btn" data-act="month" data-n="-1" aria-label="${t('previous_month')}">${icon('left')}</button>
       <b>${esc(monthLabel)}</b>
-      <button class="icon-btn" data-act="month" data-n="1">${icon('right')}</button>
+      <button class="icon-btn" data-act="month" data-n="1" aria-label="${t('next_month')}">${icon('right')}</button>
     </div>
-    <section class="card">
-      <div class="tiles">
-        <div class="tile"><small>${t('income')}</small><b>${money(income)}</b></div>
-        <div class="tile"><small>${t('expenses')}</small><b>${money(spent)}</b></div>
-        <div class="tile"><small>${t('savings')}</small><b class="${savings >= 0 ? 'pos' : 'neg'}">${money(savings)}</b></div>
+    <section class="card balance-card">
+      <p class="eyebrow">${t('balance')}</p><b class="balance-value ${savings < 0 ? 'neg' : ''}">${money(savings)}</b>
+      <div class="balance-breakdown"><div><span>${t('income')}</span><b>${money(income)}</b></div><div><span>${t('expenses')}</span><b>${money(spent)}</b></div></div>
+      <details class="finance-details" data-disclosure="finance"><summary>${t('details')}</summary><div class="tiles">
         <div class="tile"><small>${t('efficiency')}</small><b class="${eff >= 0 ? 'pos' : 'neg'}">${eff}%</b></div>
-        <div class="tile"><small>${t('unneeded')}</small><b class="neg">${money(unneeded)}</b></div>
-        <div class="tile"><small>${t('unneeded_share')}</small><b class="neg">${unShare}%</b></div>
-      </div>
-      ${np ? `<p class="muted">${t('next_payday')}: ${esc(fmtDate(np.key))} · ${money(np.amount)}</p>` : ''}
+        <div class="tile"><small>${t('unneeded')}</small><b>${money(unneeded)}</b></div>
+        <div class="tile"><small>${t('unneeded_share')}</small><b>${unShare}%</b></div>
+      </div></details>
+      ${np && np.amount > 0 ? `<p class="muted payday">${t('next_payday')}: ${esc(fmtDate(np.key))} · ${money(np.amount)}</p>` : ''}
     </section>
-    <section class="card"><h3>${t('by_cat')}</h3>${bars(byCat, money)}</section>
-    <form class="card form" data-form="addIncome">
-      <h3>${t('add_income')}</h3>
-      <div class="row2">
-        <label>${t('amount')}<input name="amount" type="number" step="0.01" min="0" required></label>
-        <label>${t('date')}<input name="date" type="date" value="${keyOf(new Date())}" required></label>
-      </div>
-      <input name="note" placeholder="${t('note')}" maxlength="60">
-      <button class="primary">${icon('plus')} ${t('add_income')}</button>
-    </form>
-    <form class="card form" data-form="addExpense">
-      <h3>${t('add_expense')}</h3>
-      <div class="row2">
-        <label>${t('amount')}<input name="amount" type="number" step="0.01" min="0" required></label>
-        <label>${t('date')}<input name="date" type="date" value="${keyOf(new Date())}" required></label>
-      </div>
-      <div class="row2">
-        <label>${t('cat_fin')}<select name="catId">${catOpts}</select></label>
-        <label class="check"><input type="checkbox" name="needed" checked> ${t('needed')}</label>
-      </div>
-      <input name="note" placeholder="${t('note')}" maxlength="60">
-      <button class="primary">${icon('plus')} ${t('add_expense')}</button>
-    </form>
+    <div class="row2 finance-actions"><button class="primary" data-act="openSheet" data-sheet="addExpense">− ${t('expense_short')}</button><button data-act="openSheet" data-sheet="addIncome">${icon('plus')} ${t('income_short')}</button></div>
+    <section class="card"><h3>${t('by_cat')}</h3>${byCat.length ? bars(byCat, money) : `<p class="muted finance-empty">${t('empty_finance')}</p>`}</section>
+
+
     <section class="card">
-      <ul class="mini">${rows.length ? rows.map((r) => `<li><small>${r.x.date.slice(5)}</small><span>${esc(r.sub)}</span>
+      <h3>${t('transactions')}</h3><ul class="mini transactions">${rows.length ? rows.map((r) => `<li><small>${r.x.date.slice(5)}</small><span>${esc(r.sub)}</span>
         <b class="${r.kind === 'income' ? 'pos' : 'neg'}">${r.kind === 'income' ? '+' : '−'}${money(r.x.amount)}</b>
-        <button class="icon-btn" data-act="delFin" data-kind="${r.kind}" data-id="${r.x.id}">${icon('trash')}</button></li>`).join('') : `<li class="empty">${t('none')}</li>`}</ul>
+        <button class="icon-btn" data-act="delFin" data-kind="${r.kind}" data-id="${r.x.id}">${icon('trash')}</button></li>`).join('') : `<li class="empty">${t('no_transactions')}</li>`}</ul>
     </section>`;
 }
 
@@ -996,6 +970,102 @@ function viewNotes() {
 const NAV = [['tasks', 'tasks'], ['notes', 'note'], ['stats', 'chart'], ['finance', 'wallet'], ['settings', 'gear']];
 const VIEWS = { tasks: viewTasks, notes: viewNotes, stats: viewStats, finance: viewFinance, settings: viewSettings };
 
+// Native dialog supplies keyboard trapping, Escape, and inert background.
+let sheetTrigger = null;
+let sheetScroll = 0;
+function sheetForm(kind) {
+  const catOpts = S.fin.cats.map((c) => `<option value="${c.id}">${esc(label(c))}</option>`).join('');
+  switch (kind) {
+    case 'addTask': return `
+    <form class="form sheet-form" data-form="addTask">
+      <label>${t('task_title')}<input name="title" placeholder="${t('task_title')}" required maxlength="80" autocomplete="off"></label>
+      <div class="row2">
+        <label>${t('minutes')}<input name="minutes" type="number" min="1" max="600" value="25" required inputmode="numeric"></label>
+        <label>${t('category')}<select name="cat">${S.cats.map((c) => `<option value="${c.id}">${esc(label(c))}</option>`).join('')}</select></label>
+      </div>
+      <details class="advanced"><summary>${t('more')}</summary><label>${t('auto_start')}<input name="startAt" type="time"></label>
+      <p class="muted hint">${t('auto_hint')}</p></details>
+      <button class="primary">${icon('plus')} ${t('add')}</button>
+    </form>`;
+    case 'addIncome': return `
+    <form class="form sheet-form" data-form="addIncome">
+      <div class="row2">
+        <label>${t('amount')}<input name="amount" type="number" step="0.01" min="0.01" inputmode="decimal" required></label>
+        <label>${t('date')}<input name="date" type="date" value="${keyOf(new Date())}" required></label>
+      </div>
+      <label>${t('note')}<input name="note" placeholder="${t('note')}" maxlength="60"></label>
+      <button class="primary">${icon('plus')} ${t('add_income')}</button>
+    </form>`;
+    case 'addExpense': return `
+    <form class="form sheet-form" data-form="addExpense">
+      <div class="row2">
+        <label>${t('amount')}<input name="amount" type="number" step="0.01" min="0.01" inputmode="decimal" required></label>
+        <label>${t('date')}<input name="date" type="date" value="${keyOf(new Date())}" required></label>
+      </div>
+      <div class="row2">
+        <label>${t('cat_fin')}<select name="catId">${catOpts}</select></label>
+        <label class="check"><input type="checkbox" name="needed" checked> ${t('needed')}</label>
+      </div>
+      <label>${t('note')}<input name="note" placeholder="${t('note')}" maxlength="60"></label>
+      <button class="primary">${icon('plus')} ${t('add_expense')}</button>
+    </form>`;
+    default: return '';
+  }
+}
+function openSheet(kind) {
+  const content = sheetForm(kind);
+  if (!content) return;
+  const dialog = $('#entrySheet');
+  sheetTrigger = document.activeElement;
+  sheetScroll = window.scrollY;
+  dialog.innerHTML = `<div class="sheet-head"><h2 id="sheetTitle">${t(kind === 'addTask' ? 'new_task' : kind === 'addIncome' ? 'add_income' : 'add_expense')}</h2><button type="button" class="icon-btn ghost" data-act="closeSheet" aria-label="${t('close')}">${icon('x')}</button></div>${content}`;
+  document.body.classList.add('sheet-open');
+  document.body.style.top = `-${sheetScroll}px`;
+  dialog.showModal();
+  dialog.querySelector('input').focus();
+}
+function closeSheet() { const d = $('#entrySheet'); if (d.open) d.close(); }
+function initSheet() {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'entrySheet'; dialog.className = 'entry-sheet';
+  dialog.setAttribute('aria-labelledby', 'sheetTitle');
+  document.body.appendChild(dialog);
+  dialog.addEventListener('click', (e) => {
+    const r = dialog.getBoundingClientRect();
+    if (e.target === dialog && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) closeSheet();
+  });
+  dialog.addEventListener('close', () => {
+    document.body.classList.remove('sheet-open'); document.body.style.top = '';
+    window.scrollTo(0, sheetScroll);
+    if (sheetTrigger && sheetTrigger.isConnected) sheetTrigger.focus({preventScroll:true});
+    else $('#main [data-act="openSheet"]')?.focus({preventScroll:true});
+  });
+  const status = document.createElement('div'); status.id = 'actionStatus'; status.className = 'sr-only'; status.setAttribute('role','status'); document.body.appendChild(status);
+}
+const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+const reduceMotion = () => motionPreference.matches;
+motionPreference.addEventListener('change', (e) => {
+  if (e.matches) document.getAnimations().forEach((animation) => animation.cancel());
+});
+function taskPositions() {
+  return new Map([...document.querySelectorAll('[data-task-id]')].map((el) => [el.dataset.taskId, {rect: el.getBoundingClientRect(), status: el.dataset.status, focused: el.classList.contains('focused')}]));
+}
+function animateTasks(previous) {
+  if (reduceMotion()) return;
+  document.querySelectorAll('[data-task-id]').forEach((el) => {
+    const prev = previous.get(el.dataset.taskId), rect = el.getBoundingClientRect();
+    if (!prev) el.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:220,easing:'ease-out'});
+    else {
+      const dy = prev.rect.top - rect.top;
+      if (Math.abs(dy) > 1) el.animate([{transform:`translateY(${dy}px)`},{transform:'translateY(0)'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
+      if (prev.status !== el.dataset.status || prev.focused !== el.classList.contains('focused')) {
+        el.animate([{backgroundColor:el.dataset.status === 'done' ? 'color-mix(in srgb, var(--ok) 14%, var(--card))' : 'var(--card2)'},{backgroundColor:getComputedStyle(el).backgroundColor}],{duration:300});
+        if (el.dataset.status === 'done') el.querySelectorAll('.mark path, .mark polyline').forEach((path) => path.animate([{strokeDasharray:40,strokeDashoffset:40},{strokeDasharray:40,strokeDashoffset:0}],{duration:300}));
+      }
+    }
+  });
+}
+
 let renderedView = null;
 function fieldKeys(root) {
   const seen = new Map();
@@ -1044,13 +1114,27 @@ function restoreFields(snap) {
 }
 function render() {
   const snap = captureFields();
+  const previous = taskPositions();
+  const viewChanged = renderedView !== ui.view;
+  const disclosures = [...document.querySelectorAll('#main details[data-disclosure]')].filter((el) => el.open).map((el) => el.dataset.disclosure);
+  const focused = document.activeElement?.closest('#main [data-act]');
+  const focusKey = focused ? {act:focused.dataset.act, id:focused.dataset.id, n:focused.dataset.n, wd:focused.dataset.wd} : null;
   const keepScroll = renderedView === ui.view ? window.scrollY : 0;
   document.documentElement.dataset.theme = S.theme;
   document.documentElement.lang = S.lang;
-  $('#nav').innerHTML = NAV.map(([v, ic]) => `<button class="${ui.view === v ? 'on' : ''}" data-act="tab" data-v="${v}">${icon(ic)}<span>${t(v)}</span></button>`).join('');
+  $('#nav').style.setProperty('--tab', NAV.findIndex(([v]) => v === ui.view));
+  if (!$('#nav').children.length) $('#nav').innerHTML = NAV.map(([v, ic]) => `<button aria-current="${ui.view === v ? 'page' : 'false'}" class="${ui.view === v ? 'on' : ''}" data-act="tab" data-v="${v}">${icon(ic)}<span>${t(v)}</span></button>`).join('');
+  $('#nav').querySelectorAll('[data-v]').forEach((button) => { const active = button.dataset.v === ui.view; button.classList.toggle('on', active); button.setAttribute('aria-current', active ? 'page' : 'false'); button.querySelector('span').textContent = t(button.dataset.v); });
   $('#main').innerHTML = VIEWS[ui.view]();
+  $('#main').querySelectorAll('button[title]').forEach((button) => { if (!button.hasAttribute('aria-label')) button.setAttribute('aria-label', button.title); });
   renderedView = ui.view;
   restoreFields(snap);
+  if (!viewChanged) {
+    document.querySelectorAll('#main details[data-disclosure]').forEach((el) => { el.open = disclosures.includes(el.dataset.disclosure); });
+    if (focusKey) [...document.querySelectorAll('#main [data-act]')].find((el) => el.dataset.act === focusKey.act && el.dataset.id === focusKey.id && el.dataset.n === focusKey.n && el.dataset.wd === focusKey.wd)?.focus({preventScroll:true});
+  }
+  if (viewChanged && !reduceMotion()) $('#main').animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],{duration:160,easing:'ease-out'});
+  else animateTasks(previous);
   window.scrollTo(0, keepScroll);
   updateWarn();
 }
@@ -1061,10 +1145,8 @@ function updateWarn() {
   const needLogin = !!sbc() && !sync.user;
   el.hidden = !needLogin;
   if (!needLogin) return;
-  el.innerHTML = `<div class="warn-box">
-      <div class="warn-txt"><b>${t('warn_title')}</b><span>${t('warn_text')}</span></div>
-      <button class="primary" data-act="warnLogin">${t('warn_btn')}</button>
-    </div>`;
+  const opened = !!el.querySelector('details[open]');
+  el.innerHTML = `<div class="local-storage"><details ${opened ? 'open' : ''}><summary aria-label="${t('storage_info')}">${icon('home')} ${t('local_data')}</summary><p>${t('warn_text')}</p></details><button class="ghost" data-act="warnLogin">${t('enable_sync')}</button></div>`;
 }
 
 const SYNC_KEY = 'timecon.sync';
@@ -1372,6 +1454,10 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   switch (a) {
+    case 'openSheet': openSheet(b.dataset.sheet); return;
+    case 'closeSheet': closeSheet(); return;
+    case 'taskMore': ui.actionsId = ui.actionsId === id ? null : id; render(); return;
+    case 'focusTimer': ui.focusTask = id; render(); return;
     case 'tab': ui.view = b.dataset.v; ui.moveId = null; ui.timeId = null; ui.noteId = null; break;
     case 'day': ui.day = addDays(ui.day, +b.dataset.n); ui.moveId = null; ui.timeId = null; break;
     case 'today': ui.day = keyOf(new Date()); break;
@@ -1535,6 +1621,10 @@ document.addEventListener('submit', (e) => {
       S.currency = fd.get('currency');
       break;
     default: return;
+  }
+  if (['addTask', 'addIncome', 'addExpense'].includes(kind)) {
+    f.reset(); closeSheet();
+    $('#actionStatus').textContent = t(kind === 'addTask' ? 'task_added' : 'entry_added');
   }
   persist();
 });
@@ -1701,6 +1791,7 @@ function introMaybeShow() {
   showIntro();
 }
 
+initSheet();
 render();
 syncInit();
 introMaybeShow();
