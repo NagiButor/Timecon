@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v27';
+const BUILD = 'v28';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -1031,7 +1031,7 @@ let ver = 0;
 let dirty = localStorage.getItem('timecon.dirty') === '1' || !localStorage.getItem(SYNC_KEY);
 function setDirty(v) { dirty = v; localStorage.setItem('timecon.dirty', v ? '1' : '0'); }
 const cfg = window.TIMECON_SUPABASE || {};
-const sync = { user: null, client: null, channel: null, updated: 0, timer: null, email: '', sent: false, msg: '', recovery: false, forgot: false, forgotSent: false };
+const sync = { user: null, client: null, channel: null, updated: 0, timer: null, email: '', sent: false, msg: '', recovery: false, forgot: false, forgotSent: false, busy: false, syncing: false, pending: false };
 try { sync.updated = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}').updated || 0; } catch (e) { /* пусто */ }
 
 function syncMeta(ts) { sync.updated = ts; localStorage.setItem(SYNC_KEY, JSON.stringify({ updated: ts })); }
@@ -1044,7 +1044,7 @@ function sbc() {
 function schedulePush() {
   if (!sync.user) return;
   clearTimeout(sync.timer);
-  sync.timer = setTimeout(() => syncCycle().catch(failSync), 800);
+  sync.timer = setTimeout(pullSafe, 800);
 }
 function unionById(a = [], b = []) {
   const m = new Map();
@@ -1151,8 +1151,20 @@ function failSync() {
   sync.msg = 'sync_fail';
   render();
 }
+// Синхронизацию запускаем по одному разу за раз: Realtime, опрос и кнопка
+// не должны выполнять цикл одновременно. Лишние вызовы схлопываются в один повтор.
 function pullSafe() {
-  syncCycle().catch(failSync);
+  if (sync.syncing) { sync.pending = true; return; }
+  const run = async () => {
+    sync.syncing = true;
+    try { await syncCycle(); }
+    catch (e) { failSync(); }
+    finally {
+      sync.syncing = false;
+      if (sync.pending) { sync.pending = false; pullSafe(); }
+    }
+  };
+  run();
 }
 // Мгновенное получение изменений с других устройств через Realtime.
 function onRemote(payload) {
@@ -1211,25 +1223,50 @@ async function handleOAuthReturn() {
 }
 async function syncGoogle() {
   sync.msg = '';
+  sync.busy = true;
   render();
-  const { error } = await sbc().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/' } });
-  if (error) { sync.msg = error.message; render(); }
+  try {
+    const { error } = await sbc().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/' } });
+    if (error) sync.msg = error.message;
+  } catch (e) {
+    sync.msg = e.message || t('sync_fail');
+  } finally {
+    sync.busy = false;
+    render();
+  }
 }
 async function syncForgot(email) {
   sync.msg = '';
-  const { error } = await sbc().auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
-  sync.forgotSent = !error;
-  if (error) sync.msg = error.message;
+  sync.busy = true;
   render();
+  try {
+    const { error } = await sbc().auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+    sync.forgotSent = !error;
+    if (error) sync.msg = error.message;
+  } catch (e) {
+    sync.msg = e.message || t('sync_fail');
+  } finally {
+    sync.busy = false;
+    render();
+  }
 }
 async function syncSetPassword(pw1, pw2) {
   if (pw1 !== pw2) { sync.msg = 'sync_password_mismatch'; render(); return; }
   if (!sbc() || !sync.user) { sync.msg = 'sync_link_expired'; render(); return; }
-  const { error } = await sbc().auth.updateUser({ password: pw1 });
-  if (error) { sync.msg = error.message; }
-  else { sync.recovery = false; sync.forgotSent = false; sync.msg = 'sync_password_updated'; }
+  sync.busy = true;
+  sync.msg = '';
   render();
-  updateWarn();
+  try {
+    const { error } = await sbc().auth.updateUser({ password: pw1 });
+    if (error) sync.msg = error.message;
+    else { sync.recovery = false; sync.forgotSent = false; sync.msg = 'sync_password_updated'; }
+  } catch (e) {
+    sync.msg = e.message || t('sync_fail');
+  } finally {
+    sync.busy = false;
+    render();
+    updateWarn();
+  }
   if (sync.user) pullSafe();
 }
 function isStandalone() {
@@ -1240,16 +1277,21 @@ async function syncAuth(mode, email, password) {
   sync.msg = '';
   sync.busy = true;
   render();
-  const c = sbc().auth;
-  const { data, error } = mode === 'up'
-    ? await c.signUp({ email, password })
-    : await c.signInWithPassword({ email, password });
-  sync.busy = false;
-  if (error) sync.msg = error.message;
-  else if (mode === 'up' && !data.session) sync.msg = 'sync_check_email';
-  else sync.user = data.session ? data.session.user : null;
-  render();
-  updateWarn();
+  try {
+    const c = sbc().auth;
+    const { data, error } = mode === 'up'
+      ? await c.signUp({ email, password })
+      : await c.signInWithPassword({ email, password });
+    if (error) sync.msg = error.message;
+    else if (mode === 'up' && !data.session) sync.msg = 'sync_check_email';
+    else sync.user = data.session ? data.session.user : null;
+  } catch (e) {
+    sync.msg = e.message || t('sync_fail');
+  } finally {
+    sync.busy = false;
+    render();
+    updateWarn();
+  }
   if (sync.user) pullSafe();
 }
 function viewSync() {
@@ -1384,7 +1426,7 @@ document.addEventListener('click', (e) => {
     case 'payDel':
       S.fin.pays = (S.fin.pays || []).filter((p) => p.id !== id);
       break;
-    case 'syncNow': syncCycle().catch(failSync); return;
+    case 'syncNow': pullSafe(); return;
     case 'google': syncGoogle(); return;
     case 'forgotShow': sync.forgot = !sync.forgot; sync.forgotSent = false; render(); return;
     case 'syncOut': stopRealtime(); sbc().auth.signOut().then(() => { sync.user = null; sync.recovery = false; sync.forgot = false; sync.forgotSent = false; render(); }); return;
