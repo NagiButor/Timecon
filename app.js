@@ -1,5 +1,5 @@
 const KEY = 'timecon.v1';
-const BUILD = 'v31';
+const BUILD = 'v32';
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const pad = (n) => String(n).padStart(2, '0');
@@ -17,132 +17,32 @@ const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fil
 // Фирменный разноцветный логотип Google для кнопки входа (официальная палитра).
 const GOOGLE_LOGO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"/></svg>`;
 
-const CUR = { RUB: '₽', USD: '$', EUR: '€', KZT: '₸', UAH: '₴', BYN: 'Br', GBP: '£' };
+const CUR = { RUB: '₽', USD: '$', EUR: '€', KZT: '₸', UAH: '₴', BYN: 'Br', GBP: '£', CNY: '¥', JPY: '¥', KRW: '₩', TRY: '₺', BRL: 'R$', INR: '₹', PLN: 'zł', CHF: 'CHF', CAD: 'C$', AUD: 'A$' };
 
-const T = {
-  ru: {
-    more_actions: 'Ещё', new_task: 'Добавить задачу', empty_title: 'С чего начнём день?', empty_hint: 'Добавь первую задачу или примени сохранённый пресет.', planned: 'по плану', of: 'из', tasks_done: 'задач выполнено', focus: 'В фокусе', day_plan: 'План дня', more: 'Дополнительно', close: 'Закрыть', balance: 'Баланс за месяц', details: 'Подробности', expense_short: 'Расход', income_short: 'Доход', transactions: 'Операции', no_transactions: 'Здесь появится история операций', empty_finance: 'Добавь первую операцию, чтобы увидеть картину месяца.', local_data: 'Данные на этом устройстве', enable_sync: 'Синхронизация', storage_info: 'О хранении данных', focus_timer: 'Выделить таймер', remaining: 'Осталось', previous_day: 'Предыдущий день', next_day: 'Следующий день', previous_month: 'Предыдущий месяц', next_month: 'Следующий месяц', task_added: 'Задача добавлена', entry_added: 'Операция добавлена',
-    tasks: 'Задачи', stats: 'Статистика', finance: 'Финансы', settings: 'Настройки',
-    today: 'Сегодня', sort: 'Сортировка', sort_manual: 'По порядку добавления', sort_cat: 'По категории', sort_status: 'По статусу', sort_time: 'По времени',
-    no_tasks: 'На этот день задач нет', task_title: 'Название задачи', minutes: 'Минут', min: 'мин', category: 'Категория', add: 'Добавить',
-    apply_preset: 'Применить', save_preset: 'Сохранить день как пресет', clear_preset: 'Удалить пресет',
-    presets: 'Пресеты по дням недели', presets_empty: 'Пресеты не сохранены. Настрой день и нажми «Сохранить день как пресет».',
-    preset_hint: 'Пресет любого дня можно применить к текущему дню кнопкой «Применить».',
-    preset_clear_confirm: 'Удалить этот пресет?',
-    mark_done: 'Готово', mark_done_hint: 'Отметить сделанной без таймера', manual_mark: 'без таймера',
-    preset_confirm: 'В этот день уже есть задачи. Применить пресет и добавить ещё?',
-    cat_in_use: 'Категория используется. Удалить её? Записи останутся, но без категории.',
-    backlog: 'На потом', to_day: 'На этот день', start: 'Старт', ask_q: 'Время вышло. Задача выполнена?',
-    verdict_done: 'Выполнено', verdict_failed: 'Не выполнено', restore: 'Вернуть в работу', move: 'Перенести', ok: 'ОК',
-    tomorrow: 'Завтра', after_tomorrow: 'Послезавтра', in_week: 'Через неделю', pick_date: 'Выбрать дату', later: 'На потом',
-    delete: 'Удалить', timer_done: 'Время вышло',
-    cancel: 'Отменить', cancel_confirm: 'Отменить начатую задачу? Отсчёт остановится, и задачу можно будет запустить заново.',
-    period_day: 'День', period_week: 'Неделя', period_month: 'Месяц', period_all: 'Всё время',
-    total_time: 'Время выполненных задач', done_count: 'Выполнено', failed_count: 'Не выполнено', completion: 'Доля выполненных',
-    by_task: 'По задачам', by_cat: 'По категориям', no_data: 'Нет данных', none: 'Пусто',
-    income: 'Доходы', expenses: 'Расходы', savings: 'Экономия', efficiency: 'Доля экономии', unneeded: 'Ненужные траты', unneeded_share: 'Доля ненужных',
-    next_payday: 'Следующая выплата', add_income: 'Добавить доход', add_expense: 'Добавить трату', amount: 'Сумма', date: 'Дата', note: 'Заметка',
-    needed: 'Нужная трата', cat_fin: 'Категория', save: 'Сохранить',
-    language: 'Язык', theme: 'Тема', dark: 'Тёмная', light: 'Светлая', currency: 'Валюта',
-    pay_title: 'Выплаты зарплаты', pay_day: 'Число', pay_amount: 'Сумма', pay_add: 'Добавить выплату', pay_empty: 'Выплаты не настроены',
-    shift_weekend: 'Если выплата выпадает на выходной, переносить её на пятницу',
-    categories: 'Категории задач', fin_categories: 'Категории расходов', add_cat: 'Добавить категорию', name: 'Название', data: 'Данные',
-    export_json: 'Экспорт JSON (резервная копия)', import_json: 'Импорт JSON', export_csv: 'Экспорт CSV',
-    sync_title: 'Синхронизация', sync_not_config: 'Синхронизация не настроена: заполни config.js (см. README.md).',
-    sync_in: 'Вход выполнен', sync_email: 'Почта', sync_password: 'Пароль (минимум 6 символов)',
-    sync_login: 'Войти', sync_signup: 'Регистрация',
-    sync_google: 'Войти через Google', sync_forgot: 'Забыл пароль', sync_forgot_send: 'Отправить ссылку',
-    sync_forgot_sent: 'Ссылка для сброса пароля отправлена на почту. Проверь и папку «Спам».',
-    sync_recovery_title: 'Новый пароль', sync_password2: 'Повтори пароль', sync_set_password: 'Сохранить пароль',
-    sync_password_mismatch: 'Пароли не совпадают', sync_password_updated: 'Пароль обновлён. Ты вошёл в аккаунт.',
-    sync_link_expired: 'Ссылка устарела. Запроси сброс пароля заново.',
-    sync_standalone_hint: 'Приложение открыто с экрана «Домой»: если вход через Google не возвращает в приложение, войди с почтой и паролем.',
-    sync_check_email: 'Аккаунт создан. Войди с этой почтой и паролем.',
-    sync_fail: 'Ошибка синхронизации. Проверь интернет.',
-    sync_now: 'Синхронизировать сейчас', sync_out: 'Выйти', sync_last: 'Последняя синхронизация',
-    sync_hint: 'Один аккаунт на всех устройствах: введи на каждом ту же почту и пароль. При входе на новом устройстве данные с сервера заменят данные на этом устройстве, если на сервере уже что-то есть.',
-    warn_title: 'Данные не сохраняются',
-    warn_text: 'Ты не вошёл в аккаунт. Задачи, заметки и финансы хранятся только на этом устройстве и будут потеряны, если очистить данные браузера.',
-    warn_btn: 'Войти',
-    d: 'д', h: 'ч',
-    wd: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
-    cat_sport: 'Спорт', cat_work: 'Работа', cat_rest: 'Отдых', cat_study: 'Учёба', cat_home: 'Дом',
-    fcat_food: 'Еда', fcat_home: 'Жильё', fcat_fun: 'Развлечения', fcat_other: 'Прочее',
-    notes: 'Заметки', note_new: 'Новая заметка', note_title: 'Название заметки', note_icon: 'Иконка',
-    note_add_text: 'Текст', note_add_photo: 'Фото', note_add_code: 'Код', note_updated: 'Изменено',
-    note_empty: 'Заметок пока нет. Создай первую.', note_code_lang: 'Язык', note_confirm_del: 'Удалить заметку?',
-    note_blocks_hint: 'Блоки идут сверху вниз: текст, фото, код. Добавляй в нужном порядке.',
-    note_photo_fail: 'Не удалось загрузить фото', back: 'Назад', started_at: 'Начало',
-    storage_full: 'Память заполнена. Удали лишние фото из заметок.',
-    auto_start: 'Время автозапуска (необязательно)', auto_at: 'Авто', auto_off: 'Убрать', auto_on: 'Время автозапуска',
-    auto_hint: 'Задача запустится сама в указанное время, если приложение открыто. Если указанное время прошло больше двух часов назад, задача сама не запустится.',
-    up: 'Выше', down: 'Ниже', auto: 'авто', note_lang: 'Язык',
-    intro_skip: 'Пропустить', intro_next: 'Далее', intro_start: 'Начать', intro_show: 'Показать обучение',
-  },
-  en: {
-    more_actions: 'More', new_task: 'Add task', empty_title: 'Where shall we start?', empty_hint: 'Add your first task or apply a saved preset.', planned: 'planned', of: 'of', tasks_done: 'tasks completed', focus: 'In focus', day_plan: 'Day plan', more: 'More options', close: 'Close', balance: 'Monthly balance', details: 'Details', expense_short: 'Expense', income_short: 'Income', transactions: 'Transactions', no_transactions: 'Your transactions will appear here', empty_finance: 'Add your first transaction to see your month at a glance.', local_data: 'Data on this device', enable_sync: 'Enable sync', storage_info: 'About data storage', focus_timer: 'Focus this timer', remaining: 'Remaining', previous_day: 'Previous day', next_day: 'Next day', previous_month: 'Previous month', next_month: 'Next month', task_added: 'Task added', entry_added: 'Transaction added',
-    tasks: 'Tasks', stats: 'Stats', finance: 'Finance', settings: 'Settings',
-    today: 'Today', sort: 'Sort', sort_manual: 'In added order', sort_cat: 'By category', sort_status: 'By status', sort_time: 'By duration',
-    no_tasks: 'No tasks for this day', task_title: 'Task title', minutes: 'Minutes', min: 'min', category: 'Category', add: 'Add',
-    apply_preset: 'Apply', save_preset: 'Save day as preset', clear_preset: 'Delete preset',
-    presets: 'Presets by weekday', presets_empty: 'No presets saved. Set up a day and tap "Save day as preset".',
-    preset_hint: 'Any weekday preset can be applied to the current day with the "Apply" button.',
-    preset_clear_confirm: 'Delete this preset?',
-    mark_done: 'Done', mark_done_hint: 'Mark as done without a timer', manual_mark: 'no timer',
-    preset_confirm: 'This day already has tasks. Apply the preset and add more?',
-    cat_in_use: 'This category is in use. Delete it? The entries will stay but without a category.',
-    backlog: 'Later', to_day: 'To this day', start: 'Start', ask_q: 'Time is up. Was the task done?',
-    verdict_done: 'Done', verdict_failed: 'Not done', restore: 'Back to work', move: 'Move', ok: 'OK',
-    tomorrow: 'Tomorrow', after_tomorrow: 'Day after tomorrow', in_week: 'In a week', pick_date: 'Pick a date', later: 'Later',
-    delete: 'Delete', timer_done: 'Time is up',
-    cancel: 'Cancel', cancel_confirm: 'Cancel the started task? The countdown will stop, and you will be able to start the task again.',
-    period_day: 'Day', period_week: 'Week', period_month: 'Month', period_all: 'All time',
-    total_time: 'Time on done tasks', done_count: 'Done', failed_count: 'Not done', completion: 'Completion rate',
-    by_task: 'By task', by_cat: 'By category', no_data: 'No data', none: 'Empty',
-    income: 'Income', expenses: 'Expenses', savings: 'Savings', efficiency: 'Savings rate', unneeded: 'Unneeded spending', unneeded_share: 'Unneeded share',
-    next_payday: 'Next payment', add_income: 'Add income', add_expense: 'Add expense', amount: 'Amount', date: 'Date', note: 'Note',
-    needed: 'Necessary', cat_fin: 'Category', save: 'Save',
-    language: 'Language', theme: 'Theme', dark: 'Dark', light: 'Light', currency: 'Currency',
-    pay_title: 'Pay schedule', pay_day: 'Day', pay_amount: 'Amount', pay_add: 'Add payment', pay_empty: 'No payments set',
-    shift_weekend: 'If a pay day falls on a weekend, move it to Friday',
-    categories: 'Task categories', fin_categories: 'Expense categories', add_cat: 'Add category', name: 'Name', data: 'Data',
-    export_json: 'Export JSON (backup)', import_json: 'Import JSON', export_csv: 'Export CSV',
-    sync_title: 'Sync', sync_not_config: 'Sync is not set up: fill in config.js (see README.md).',
-    sync_in: 'Signed in', sync_email: 'Email', sync_password: 'Password (min 6 characters)',
-    sync_login: 'Sign in', sync_signup: 'Sign up',
-    sync_google: 'Sign in with Google', sync_forgot: 'Forgot password', sync_forgot_send: 'Send link',
-    sync_forgot_sent: 'Password reset link sent to your email. Check the spam folder too.',
-    sync_recovery_title: 'New password', sync_password2: 'Repeat password', sync_set_password: 'Save password',
-    sync_password_mismatch: 'Passwords do not match', sync_password_updated: 'Password updated. You are signed in.',
-    sync_link_expired: 'This link has expired. Request a password reset again.',
-    sync_standalone_hint: 'The app is open from the Home Screen: if Google sign-in does not bring you back, sign in with email and password.',
-    sync_check_email: 'Account created. Sign in with this email and password.',
-    sync_fail: 'Sync error. Check your connection.',
-    sync_now: 'Sync now', sync_out: 'Sign out', sync_last: 'Last sync',
-    sync_hint: 'One account for all devices: enter the same email and password on each. When signing in on a new device, server data will replace the data on this device if the server already has data.',
-    warn_title: 'Data is not being saved',
-    warn_text: 'You are not signed in. Tasks, notes and finances are stored only on this device and will be lost if you clear browser data.',
-    warn_btn: 'Sign in',
-    d: 'd', h: 'h',
-    wd: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-    cat_sport: 'Sport', cat_work: 'Work', cat_rest: 'Rest', cat_study: 'Study', cat_home: 'Home',
-    fcat_food: 'Food', fcat_home: 'Housing', fcat_fun: 'Fun', fcat_other: 'Other',
-    notes: 'Notes', note_new: 'New note', note_title: 'Note title', note_icon: 'Icon',
-    note_add_text: 'Text', note_add_photo: 'Photo', note_add_code: 'Code', note_updated: 'Updated',
-    note_empty: 'No notes yet. Create the first one.', note_code_lang: 'Language', note_confirm_del: 'Delete this note?',
-    note_blocks_hint: 'Blocks stack top to bottom: text, photo, code. Add them in any order.',
-    note_photo_fail: 'Could not load the photo', back: 'Back', started_at: 'Started',
-    storage_full: 'Storage is full. Remove some photos from notes.',
-    auto_start: 'Auto-start time (optional)', auto_at: 'Auto', auto_off: 'Clear', auto_on: 'Auto-start time',
-    auto_hint: 'The task starts by itself at the set time when the app is open. If the set time was more than two hours ago, the task will not start by itself.',
-    up: 'Up', down: 'Down', auto: 'auto', note_lang: 'Language',
-    intro_skip: 'Skip', intro_next: 'Next', intro_start: 'Start', intro_show: 'Show intro',
-  },
-};
+// Translations live in i18n.js; English fills in any missing key.
+const T = window.TIMECON_I18N || { en: {} };
+const UI_LANGS = Object.keys(T);
+const browserLangs = () => [...(navigator.languages || []), navigator.language].filter(Boolean).map(String);
+// First run: the first supported browser language, and a currency from the browser's region.
+function guessLang() {
+  return browserLangs().map((l) => l.toLowerCase().split('-')[0]).find((c) => T[c]) || 'en';
+}
+const EURO = 'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ');
+const REGION_CUR = { RU: 'RUB', US: 'USD', GB: 'GBP', KZ: 'KZT', UA: 'UAH', BY: 'BYN', CN: 'CNY', JP: 'JPY', KR: 'KRW', TR: 'TRY', BR: 'BRL', IN: 'INR', PL: 'PLN', CH: 'CHF', CA: 'CAD', AU: 'AUD' };
+function guessCurrency() {
+  for (const tag of browserLangs()) {
+    try {
+      const region = new Intl.Locale(tag).maximize().region;
+      if (REGION_CUR[region]) return REGION_CUR[region];
+      if (EURO.includes(region)) return 'EUR';
+    } catch (e) { /* invalid tag */ }
+  }
+  return 'USD';
+}
 
 function defaults() {
   return {
-    v: 1, lang: 'ru', theme: 'dark', currency: 'RUB',
+    v: 1, lang: guessLang(), theme: 'dark', currency: guessCurrency(),
     cats: [
       { id: 'c_sport', key: 'cat_sport', icon: 'dumbbell', color: '#d4af37' },
       { id: 'c_work', key: 'cat_work', icon: 'briefcase', color: '#e0a458' },
@@ -189,7 +89,7 @@ function migrate(st) {
   return reconcileRunning(st);
 }
 let S = load();
-const ui = { view: 'tasks', day: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false, focusTask: null, actionsId: null };
+const ui = { view: 'tasks', day: keyOf(new Date()), statsDay: keyOf(new Date()), sort: 'manual', period: 'day', month: keyOf(new Date()).slice(0, 7), moveId: null, timeId: null, noteId: null, noteIconPick: false, focusTask: null, actionsId: null };
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -199,9 +99,31 @@ function persist() { ver++; setDirty(true); save(); render(); schedulePush(); }
 // Изменение без перерисовки — чтобы не сбрасывать ввод при наборе текста.
 function touch() { ver++; setDirty(true); save(); schedulePush(); }
 
-function t(k) { return (T[S.lang] && T[S.lang][k]) ?? T.ru[k] ?? k; }
-function locale() { return S.lang === 'ru' ? 'ru-RU' : 'en-US'; }
-function money(n) { return `${Number(n || 0).toLocaleString(locale(), { maximumFractionDigits: 2 })} ${CUR[S.currency] || S.currency}`; }
+function t(k) { return T[S.lang]?.[k] ?? T.en?.[k] ?? k; }
+const localeCache = {};
+// The browser's own regional variant (en-GB, pt-PT…) wins when it matches the UI language.
+function locale() {
+  if (!localeCache[S.lang]) {
+    let own = browserLangs().find((l) => l.toLowerCase().split('-')[0] === S.lang);
+    if (S.lang === 'zh' && !/^zh(-(hans|cn|sg)|$)/i.test(own || '')) own = null;
+    let loc = t('locale');
+    try { if (own && Intl.DateTimeFormat.supportedLocalesOf(own).length) loc = own; } catch (e) { /* keep default */ }
+    localeCache[S.lang] = loc;
+  }
+  return localeCache[S.lang];
+}
+// Locale-aware separators and symbol position, but the app's own currency symbols.
+function money(n) {
+  const v = Number(n || 0);
+  const digits = Number.isInteger(v) ? 0 : 2;
+  try {
+    return new Intl.NumberFormat(locale(), { style: 'currency', currency: S.currency, minimumFractionDigits: digits, maximumFractionDigits: digits })
+      .formatToParts(v).map((p) => (p.type === 'currency' ? CUR[S.currency] || p.value : p.value)).join('');
+  } catch (e) {
+    return `${v.toLocaleString(locale(), { maximumFractionDigits: 2 })} ${CUR[S.currency] || S.currency}`;
+  }
+}
+const cap = (s) => (s ? s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1) : s);
 function label(c) { return !c ? '—' : (c.key ? t(c.key) : c.name); }
 function catById(id) { return S.cats.find((c) => c.id === id); }
 function finCat(id) { return S.fin.cats.find((c) => c.id === id); }
@@ -216,6 +138,7 @@ function fmtDur(min) {
 }
 function fmtClock(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`; }
 function fmtDate(k) { return parseKey(k).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' }); }
+const fmtShortDate = (k) => parseKey(k).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 const fmtDateTime = (ts) => new Date(ts).toLocaleString(locale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 function findTask(id) {
@@ -287,7 +210,45 @@ function addTaskTo(key, task) {
 function deleteTask(id) {
   const f = findTask(id);
   if (!f || f.task.status === 'running') return;
-  S.days[f.key] = S.days[f.key].filter((x) => x.id !== id);
+  removeWithUndo(() => S.days[f.key] || (S.days[f.key] = []), id, 'task_deleted', stampT);
+}
+// Deletion is immediate; a snackbar offers to put the item back in its place.
+// The list is looked up again on undo because a sync may have replaced S meanwhile.
+function removeWithUndo(getList, id, msgKey, onRestore) {
+  const list = getList();
+  const at = list ? list.findIndex((x) => x.id === id) : -1;
+  if (at < 0) return;
+  const [item] = list.splice(at, 1);
+  showUndo(t(msgKey), () => {
+    const now = getList();
+    if (!now || now.some((x) => x.id === id)) return;
+    now.splice(Math.min(at, now.length), 0, item);
+    if (onRestore) onRestore(item);
+  });
+}
+const toast = { el: null, timer: null, undo: null };
+function showUndo(msg, undo) {
+  if (!toast.el) {
+    toast.el = document.createElement('div');
+    toast.el.className = 'toast';
+    toast.el.innerHTML = '<span></span><button type="button" class="primary" data-act="undo"></button>';
+    document.body.appendChild(toast.el);
+  }
+  toast.undo = undo;
+  toast.el.querySelector('span').textContent = msg;
+  toast.el.querySelector('button').textContent = t('undo');
+  toast.el.hidden = false;
+  toast.el.classList.remove('show');
+  void toast.el.offsetWidth;
+  toast.el.classList.add('show');
+  $('#actionStatus').textContent = msg;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(hideToast, 6000);
+}
+function hideToast() {
+  clearTimeout(toast.timer);
+  toast.undo = null;
+  if (toast.el) toast.el.hidden = true;
 }
 function runningList() {
   if (Array.isArray(S.running)) return S.running;
@@ -508,6 +469,7 @@ function taskCard(x, i, total, focused = false) {
       <button class="ok" data-act="finishNow" data-id="${x.id}" title="${t('mark_done_hint')}">${icon('check')} ${t('mark_done')}</button>
       <button type="button" class="ghost task-more-toggle" data-act="taskMore" data-id="${x.id}" aria-expanded="${ui.actionsId === x.id}" aria-controls="actions-${x.id}">${t('more_actions')} <span aria-hidden="true">⋯</span></button></div>
       ${ui.actionsId === x.id ? `<div class="secondary-actions" id="actions-${x.id}">
+        <button type="button" data-act="edit" data-id="${x.id}">${icon('edit')} ${t('edit')}</button>
         <button type="button" data-act="time" data-id="${x.id}">${icon('clock')} ${t('auto_on')}</button>${order}
         <button type="button" data-act="move" data-id="${x.id}">${icon('move')} ${t('move')}</button>
         <button type="button" data-act="del" data-id="${x.id}">${icon('trash')} ${t('delete')}</button>
@@ -515,6 +477,7 @@ function taskCard(x, i, total, focused = false) {
   } else {
     body = `<div class="acts">
       <button class="icon-btn" data-act="restore" data-id="${x.id}" title="${t('restore')}">${icon('undo')}</button>
+      <button class="icon-btn" data-act="edit" data-id="${x.id}" title="${t('edit')}">${icon('edit')}</button>
       <button class="icon-btn" data-act="del" data-id="${x.id}" title="${t('delete')}">${icon('trash')}</button></div>`;
   }
   const mark = x.status === 'done' ? `<span class="mark ok">${icon('check')}</span>`
@@ -573,30 +536,48 @@ function viewTasks() {
     <section class="day-hero">
       <div class="day-heading"><div><p class="eyebrow">${esc(t('wd')[weekdayOf(ui.day)])} · ${esc(parseKey(ui.day).toLocaleDateString(locale(), {day:'numeric',month:'long'}))}</p>
         <h2>${esc(heading)}</h2></div>
-        <div class="day-arrows"><button class="icon-btn ghost" data-act="day" data-n="-1" aria-label="${t('previous_day')}">${icon('left')}</button>
-        <button class="icon-btn ghost" data-act="day" data-n="1" aria-label="${t('next_day')}">${icon('right')}</button></div></div>
+        <div class="day-arrows"><button class="icon-btn ghost" data-act="day" data-n="-1" aria-label="${t('previous_day')}" aria-keyshortcuts="ArrowLeft">${icon('left')}</button>
+        <span class="date-jump" title="${t('go_to_date')}">${icon('calendar')}<input type="date" data-change="jumpDay" data-transient value="${ui.day}" aria-label="${t('go_to_date')}"></span>
+        <button class="icon-btn ghost" data-act="day" data-n="1" aria-label="${t('next_day')}" aria-keyshortcuts="ArrowRight">${icon('right')}</button></div></div>
       ${list.length ? `<p class="day-summary"><b>${completed}</b> ${t('of')} ${list.length} ${t('tasks_done')}<span>·</span>${fmtDur(sum(list.map((x) => +x.minutes || 0)))} ${t('planned')}</p>` : ''}
     </section>
     ${active.length ? `<div class="section-label"><span class="live-dot"></span>${t('focus')}<small>${active.length}</small></div><ul class="tasks focus-list">${active.map(card).join('')}</ul>` : ''}
     ${rest.length ? `<div class="toolbar plan-toolbar"><h3>${t('day_plan')}</h3><label><span class="sr-only">${t('sort')}</span><select aria-label="${t('sort')}" data-change="sort">${sorts.map(([v,k]) => `<option value="${v}" ${ui.sort === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></label></div>` : ''}
     ${rest.length ? `<ul class="tasks">${rest.map(card).join('')}</ul>` : !list.length ? `<section class="empty-day"><span class="empty-symbol">${icon('tasks')}</span><h3>${t('empty_title')}</h3><p>${t('empty_hint')}</p></section>` : ''}
-    <div class="day-actions"><button class="primary add-task" data-act="openSheet" data-sheet="addTask">${icon('plus')} ${t('new_task')}</button>${!isToday ? `<button class="ghost" data-act="today">${t('today')}</button>` : ''}</div>
+    <div class="day-actions"><button class="primary add-task" data-act="openSheet" data-sheet="addTask" aria-keyshortcuts="N">${icon('plus')} ${t('new_task')}</button>${!isToday ? `<button class="ghost" data-act="today" aria-keyshortcuts="T">${t('today')}</button>` : ''}</div>
     <details class="quiet-section" data-disclosure="presets"><summary>${t('presets')}<span>${Object.values(S.presets).filter((a) => a.length).length}</span></summary>${viewPresets()}</details>
     <details class="quiet-section" data-disclosure="backlog"><summary>${t('backlog')}<span>${S.backlog.length}</span></summary>
       ${S.backlog.length ? `<ul class="mini">${S.backlog.map((x) => `<li>${icon((catById(x.catId) || {}).icon || 'star')}<span>${esc(x.title)}</span><button class="ghost" data-act="fromBacklog" data-id="${x.id}">${t('to_day')}</button><button class="icon-btn" data-act="delBacklog" data-id="${x.id}" aria-label="${t('delete')}">${icon('trash')}</button></li>`).join('')}</ul>` : `<p class="empty">${t('none')}</p>`}
     </details>`;
 }
 
+function weekRange(d) {
+  const start = addDays(d, -((parseKey(d).getDay() + 6) % 7));
+  return { start, end: addDays(start, 6) };
+}
 function periodPred() {
-  const d = ui.day;
+  const d = ui.statsDay;
   if (ui.period === 'day') return (k) => k === d;
   if (ui.period === 'week') {
-    const dow = (parseKey(d).getDay() + 6) % 7;
-    const start = addDays(d, -dow), end = addDays(start, 6);
+    const { start, end } = weekRange(d);
     return (k) => k >= start && k <= end;
   }
   if (ui.period === 'month') return (k) => monthOf(k) === monthOf(d);
   return () => true;
+}
+function periodLabel() {
+  const d = parseKey(ui.statsDay);
+  const year = d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {};
+  if (ui.period === 'day') return cap(d.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'long', ...year }));
+  if (ui.period === 'month') return cap(d.toLocaleDateString(locale(), { month: 'long', year: 'numeric' }));
+  const { start, end } = weekRange(ui.statsDay);
+  const f = new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', ...year });
+  return f.formatRange ? f.formatRange(parseKey(start), parseKey(end)) : `${f.format(parseKey(start))} – ${f.format(parseKey(end))}`;
+}
+function shiftStats(n) {
+  ui.statsDay = ui.period === 'day' ? addDays(ui.statsDay, n)
+    : ui.period === 'week' ? addDays(ui.statsDay, 7 * n)
+    : `${shiftMonth(monthOf(ui.statsDay), n)}-01`;
 }
 
 function viewStats() {
@@ -610,7 +591,12 @@ function viewStats() {
   const byCat = agg(done, (x) => x.catId, (x) => label(catById(x.catId)), (x) => x.minutes);
   const periods = [['day', 'period_day'], ['week', 'period_week'], ['month', 'period_month'], ['all', 'period_all']];
   return `
-    <div class="periods">${periods.map(([v, k]) => `<button class="${ui.period === v ? 'on' : ''}" data-act="period" data-p="${v}">${t(k)}</button>`).join('')}</div>
+    <div class="periods">${periods.map(([v, k]) => `<button class="${ui.period === v ? 'on' : ''}" data-act="period" data-p="${v}" aria-pressed="${ui.period === v}">${t(k)}</button>`).join('')}</div>
+    ${ui.period !== 'all' ? `<div class="card daybar">
+      <button class="icon-btn" data-act="statsShift" data-n="-1" aria-label="${t('previous_period')}" aria-keyshortcuts="ArrowLeft">${icon('left')}</button>
+      <b>${esc(periodLabel())}</b>
+      <button class="icon-btn" data-act="statsShift" data-n="1" aria-label="${t('next_period')}" aria-keyshortcuts="ArrowRight">${icon('right')}</button>
+    </div>` : ''}
     <section class="card">
       <div class="tiles">
         <div class="tile"><small>${t('total_time')}</small><b>${fmtDur(doneMin)}</b></div>
@@ -641,12 +627,12 @@ function viewFinance() {
     ...incs.map((x) => ({ kind: 'income', x, sub: x.note || t('income') })),
     ...exps.map((x) => ({ kind: 'expense', x, sub: x.note || label(finCat(x.catId)) })),
   ].sort((a, b) => b.x.date.localeCompare(a.x.date));
-  const monthLabel = new Date(+m.slice(0, 4), +m.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
+  const monthLabel = cap(new Date(+m.slice(0, 4), +m.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'long', year: 'numeric' }));
   return `
     <div class="card daybar">
-      <button class="icon-btn" data-act="month" data-n="-1" aria-label="${t('previous_month')}">${icon('left')}</button>
+      <button class="icon-btn" data-act="month" data-n="-1" aria-label="${t('previous_month')}" aria-keyshortcuts="ArrowLeft">${icon('left')}</button>
       <b>${esc(monthLabel)}</b>
-      <button class="icon-btn" data-act="month" data-n="1" aria-label="${t('next_month')}">${icon('right')}</button>
+      <button class="icon-btn" data-act="month" data-n="1" aria-label="${t('next_month')}" aria-keyshortcuts="ArrowRight">${icon('right')}</button>
     </div>
     <section class="card balance-card">
       <p class="eyebrow">${t('balance')}</p><b class="balance-value ${savings < 0 ? 'neg' : ''}">${money(savings)}</b>
@@ -658,20 +644,20 @@ function viewFinance() {
       </div></details>
       ${np && np.amount > 0 ? `<p class="muted payday">${t('next_payday')}: ${esc(fmtDate(np.key))} · ${money(np.amount)}</p>` : ''}
     </section>
-    <div class="row2 finance-actions"><button class="primary" data-act="openSheet" data-sheet="addExpense">− ${t('expense_short')}</button><button data-act="openSheet" data-sheet="addIncome">${icon('plus')} ${t('income_short')}</button></div>
+    <div class="row2 finance-actions"><button class="primary" data-act="openSheet" data-sheet="addExpense" aria-keyshortcuts="N">− ${t('expense_short')}</button><button data-act="openSheet" data-sheet="addIncome">${icon('plus')} ${t('income_short')}</button></div>
     <section class="card"><h3>${t('by_cat')}</h3>${byCat.length ? bars(byCat, money) : `<p class="muted finance-empty">${t('empty_finance')}</p>`}</section>
 
 
     <section class="card">
-      <h3>${t('transactions')}</h3><ul class="mini transactions">${rows.length ? rows.map((r) => `<li><small>${r.x.date.slice(5)}</small><span>${esc(r.sub)}</span>
+      <h3>${t('transactions')}</h3><ul class="mini transactions">${rows.length ? rows.map((r) => `<li><small>${esc(fmtShortDate(r.x.date))}</small><span>${esc(r.sub)}</span>
         <b class="${r.kind === 'income' ? 'pos' : 'neg'}">${r.kind === 'income' ? '+' : '−'}${money(r.x.amount)}</b>
-        <button class="icon-btn" data-act="delFin" data-kind="${r.kind}" data-id="${r.x.id}">${icon('trash')}</button></li>`).join('') : `<li class="empty">${t('no_transactions')}</li>`}</ul>
+        <button class="icon-btn" data-act="delFin" data-kind="${r.kind}" data-id="${r.x.id}" aria-label="${t('delete')}">${icon('trash')}</button></li>`).join('') : `<li class="empty">${t('no_transactions')}</li>`}</ul>
     </section>`;
 }
 
 function catEditor(kind, list, formKind) {
   return `<ul class="mini">${list.map((c) => `<li>${icon(c.icon)}<span>${esc(label(c))}</span>
-      <button class="icon-btn" data-act="delCat" data-kind="${kind}" data-id="${c.id}">${icon('trash')}</button></li>`).join('')}</ul>
+      <button class="icon-btn" data-act="delCat" data-kind="${kind}" data-id="${c.id}" aria-label="${t('delete')}">${icon('trash')}</button></li>`).join('')}</ul>
     <form class="form" data-form="${formKind}">
       <input name="name" placeholder="${t('name')}" required maxlength="30">
       <div class="icon-grid">${CAT_ICONS.map((n, i) => `<label class="ico"><input type="radio" name="icon" value="${n}" ${i === 0 ? 'checked' : ''}>${icon(n)}</label>`).join('')}</div>
@@ -682,17 +668,12 @@ function catEditor(kind, list, formKind) {
 
 function viewSettings() {
   return `
-    <form class="card form" data-form="settings">
+    <section class="card form">
       <h3>${t('settings')}</h3>
-      <label>${t('language')}<select name="lang">
-        <option value="ru" ${S.lang === 'ru' ? 'selected' : ''}>Русский</option>
-        <option value="en" ${S.lang === 'en' ? 'selected' : ''}>English</option></select></label>
-      <label>${t('theme')}<select name="theme">
-        <option value="dark" ${S.theme === 'dark' ? 'selected' : ''}>${t('dark')}</option>
-        <option value="light" ${S.theme === 'light' ? 'selected' : ''}>${t('light')}</option></select></label>
-      <label>${t('currency')}<select name="currency">${Object.keys(CUR).map((c) => `<option value="${c}" ${S.currency === c ? 'selected' : ''}>${c} ${CUR[c]}</option>`).join('')}</select></label>
-      <button class="primary">${t('save')}</button>
-    </form>
+      <label>${t('language')}${S.lang === 'en' ? '' : ' · Language'}<select data-change="lang">${UI_LANGS.map((c) => `<option value="${c}" ${S.lang === c ? 'selected' : ''}>${esc(T[c].lang_name || c)}</option>`).join('')}</select></label>
+      <label>${t('theme')}<select data-change="theme">${[['dark', 'dark'], ['light', 'light'], ['system', 'theme_system']].map(([v, k]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></label>
+      <label>${t('currency')}<select data-change="currency">${Object.keys(CUR).map((c) => `<option value="${c}" ${S.currency === c ? 'selected' : ''}>${c} ${CUR[c]}</option>`).join('')}</select></label>
+    </section>
     <section class="card">
       <h3>${t('pay_title')}</h3>
       <ul class="mini">${[...S.fin.pays].sort((a, b) => a.day - b.day).map((p) => `<li class="pays-row">
@@ -702,7 +683,6 @@ function viewSettings() {
       <div class="acts"><button data-act="payAdd">${icon('plus')} ${t('pay_add')}</button></div>
       <label class="check"><input type="checkbox" data-change="shift" ${S.fin.shiftWeekend ? 'checked' : ''}> ${t('shift_weekend')}</label>
     </section>
-    <p class="muted" style="text-align:center">Timecon ${BUILD}</p>
     <section class="card"><h3>${t('categories')}</h3>${catEditor('cats', S.cats, 'addCat')}</section>
     <section class="card"><h3>${t('fin_categories')}</h3>${catEditor('finCats', S.fin.cats, 'addFinCat')}</section>
     <section class="card">
@@ -714,10 +694,15 @@ function viewSettings() {
       </div>
     </section>
     <section class="card">
-      <h3>${t('intro_show')}</h3>
-      <button data-act="intro">${icon('play')} ${t('intro_show')}</button>
+      <h3>${t('help')}</h3>
+      <div class="acts">
+        <button data-act="intro">${icon('play')} ${t('intro_show')}</button>
+        ${installPrompt ? `<button data-act="install">${icon('download')} ${t('install_app')}</button>` : ''}
+      </div>
+      <p class="muted hint shortcut-hint">${t('shortcuts')}: ${t('shortcuts_text')}</p>
     </section>
-    <section class="card" id="syncSection"><h3>${t('sync_title')}</h3>${viewSync()}</section>`;
+    <section class="card" id="syncSection"><h3>${t('sync_title')}</h3>${viewSync()}</section>
+    <p class="muted version">Timecon ${BUILD}</p>`;
 }
 
 const NOTE_ICONS = ['note', 'note2', 'filetext', 'image', 'pin', 'list', 'clipboard', 'palette', 'star', 'heart', 'book', 'briefcase', 'code', 'music', 'cart', 'home'];
@@ -901,11 +886,11 @@ async function noteAddPhotos(files) {
   persist();
 }
 function noteCard(n) {
-  return `<div class="card note-card" data-act="noteOpen" data-id="${n.id}">
+  return `<div class="card note-card" data-act="noteOpen" data-id="${n.id}" role="button" tabindex="0">
     <div class="note-head"><span class="note-ico">${icon(n.icon || 'note')}</span>
       <div class="note-meta"><b>${esc(n.title || t('note_title'))}</b>
       <small>${t('note_updated')}: ${fmtDateTime(n.updatedAt || Date.now())}</small></div>
-      <button class="icon-btn" data-act="noteDel" data-id="${n.id}">${icon('trash')}</button></div>
+      <button class="icon-btn" data-act="noteDel" data-id="${n.id}" aria-label="${t('delete')}">${icon('trash')}</button></div>
     <p class="muted">${esc(notePreview(n))}</p></div>`;
 }
 function noteBlock(b, i, total) {
@@ -927,9 +912,9 @@ function noteBlock(b, i, total) {
   }
   return `<div class="card note-block">
     <div class="note-block-head"><span class="muted">${typeName}</span>
-      <button class="icon-btn" data-act="noteUp" data-id="${b.id}" ${i === 0 ? 'disabled' : ''}>${icon('right', 'rot-up')}</button>
-      <button class="icon-btn" data-act="noteDown" data-id="${b.id}" ${i === total - 1 ? 'disabled' : ''}>${icon('right', 'rot-down')}</button>
-      <button class="icon-btn" data-act="noteBlockDel" data-id="${b.id}">${icon('trash')}</button></div>
+      <button class="icon-btn" data-act="noteUp" data-id="${b.id}" aria-label="${t('up')}" ${i === 0 ? 'disabled' : ''}>${icon('right', 'rot-up')}</button>
+      <button class="icon-btn" data-act="noteDown" data-id="${b.id}" aria-label="${t('down')}" ${i === total - 1 ? 'disabled' : ''}>${icon('right', 'rot-down')}</button>
+      <button class="icon-btn" data-act="noteBlockDel" data-id="${b.id}" aria-label="${t('delete')}">${icon('trash')}</button></div>
     ${body}</div>`;
 }
 function viewNoteEditor() {
@@ -963,7 +948,7 @@ function viewNoteEditor() {
 function viewNotes() {
   if (ui.noteId) return viewNoteEditor();
   const notes = [...S.notes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  return `<button class="primary" data-act="noteNew">${icon('plus')} ${t('note_new')}</button>
+  return `<button class="primary" data-act="noteNew" aria-keyshortcuts="N">${icon('plus')} ${t('note_new')}</button>
     ${notes.length ? notes.map(noteCard).join('') : `<p class="empty">${t('note_empty')}</p>`}`;
 }
 
