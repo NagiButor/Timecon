@@ -6,6 +6,10 @@ Timecon (от time consuming) — планировщик дня, который 
 
 **Открыть:** https://timecon.space/
 
+<p align="center">
+  <img src="public/intro1.jpg" alt="Возможности Timecon: задачи с таймерами, заметки с текстом, фото и кодом, статистика, учёт доходов и расходов, тёмная тема и настройки" width="480">
+</p>
+
 ---
 
 ## Зачем это приложение
@@ -203,6 +207,10 @@ TIMECON_SUPABASE_URL=https://xxxx.supabase.co TIMECON_SUPABASE_KEY=sb_publishabl
 1. Открой адрес в **Safari** (именно в Safari).
 2. «Поделиться» → **На экран «Домой»**.
 3. Запускай приложение с иконки.
+
+<p align="center">
+  <img src="public/intro2.jpg" alt="Как установить Timecon на iPhone: в Safari нажать «Поделиться», выбрать «На экран Домой» и подтвердить добавление" width="480">
+</p>
 
 ### Шаг 5. Вход и синхронизация
 
