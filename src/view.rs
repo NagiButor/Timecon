@@ -56,6 +56,16 @@ pub fn weekday(lang: &str, day: &str) -> String {
 pub fn icon(name: &str) -> Markup {
     html! { svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" { (PreEscaped(ICONS[name].as_str().unwrap_or(""))) } }
 }
+fn google_logo() -> Markup {
+    html! {
+        svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" {
+            path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" {}
+            path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" {}
+            path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" {}
+            path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" {}
+        }
+    }
+}
 pub fn duration(min: u32, lang: &str) -> String {
     let mut p = vec![];
     if min >= 1440 {
@@ -457,7 +467,13 @@ impl Ctx<'_> {
                     p class="muted"{(self.t("sync_hint"))}
                     div class="row2"{button class="primary" name="mode" value="in" disabled[self.sync.busy]{(self.t("sync_login"))} button name="mode" value="up" disabled[self.sync.busy]{(self.t("sync_signup"))}}
                 }
-                div class="auth-alt"{(self.button("google","","sync_google","","btn-google")) (self.button("forgotShow","","sync_forgot","","btn-link"))}
+                div class="auth-alt"{
+                    button type="button" class="btn-google" data-act="google" aria-label=(self.t("sync_google")) {
+                        span class="g-logo"{(google_logo())}
+                        span{(self.t("sync_google"))}
+                    }
+                    (self.button("forgotShow","","sync_forgot","","btn-link"))
+                }
                 p class="muted"{(self.t("sync_standalone_hint"))}
                 @if self.sync.forgot{form class="form" data-form="syncForgot"{input name="email" type="email" required autocomplete="username" placeholder=(self.t("sync_email"));button disabled[self.sync.busy]{(self.t("sync_forgot_send"))}}}
                 @if self.sync.forgot_sent{p class="muted"{(self.t("sync_forgot_sent"))}}
@@ -611,5 +627,32 @@ mod tests {
     #[test]
     fn styles_cannot_be_injected() {
         assert_eq!(safe_color("red;position:fixed"), "#d4af37");
+    }
+    #[test]
+    fn google_sign_in_has_branded_logo_in_both_languages_and_themes() {
+        let mut s = State::default();
+        let mut ui = Ui::new("2026-11-10".into());
+        ui.view = "settings".into();
+        for lang in ["ru", "en"] {
+            s.lang = lang.into();
+            for theme in ["dark", "light"] {
+                s.theme = theme.into();
+                let h = main(&s, &ui, 0, &SyncView::default());
+                let button = h
+                    .split("class=\"btn-google\"")
+                    .nth(1)
+                    .unwrap()
+                    .split("</button>")
+                    .next()
+                    .unwrap();
+                assert!(button.contains("data-act=\"google\""));
+                assert!(button.contains(&tr(lang, "sync_google")));
+                assert!(button.contains("class=\"g-logo\"><svg"));
+                assert!(button.contains("aria-hidden=\"true\" focusable=\"false\""));
+                for color in ["#4285F4", "#34A853", "#FBBC05", "#EA4335"] {
+                    assert!(button.contains(&format!("fill=\"{color}\"")));
+                }
+            }
+        }
     }
 }
