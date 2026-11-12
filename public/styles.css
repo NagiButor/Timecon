@@ -389,6 +389,12 @@ details[open] > summary::after { content: '−'; }
 .sheet-form { gap: 20px; }
 .sheet-form .row2 { gap: 12px; }
 .sheet-form .primary { justify-content: center; min-height: 48px; }
+.task-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.task-mode label { flex-direction: row; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; color: var(--muted); }
+.task-mode label:has(input:checked) { border-color: var(--accent); color: var(--text); background: var(--card2); }
+.task-mode input { width: auto; min-height: 0; margin: 0; flex: none; }
+.timer-fields { border: 0; padding: 0; margin: 0; min-width: 0; gap: 20px; }
+.timer-fields[hidden] { display: none; }
 .advanced { border-top: 1px solid var(--border); }
 .advanced .hint { margin-top: 12px; }
 body.sheet-open { position: fixed; width: 100%; overflow: hidden; }
@@ -423,6 +429,7 @@ body.sheet-open { position: fixed; width: 100%; overflow: hidden; }
 }
 /* Secondary actions expand in-flow: no tiny icon cluster or overlapping menu. */
 .task-primary-actions { display: grid; grid-template-columns: auto auto 1fr; align-items: start; }
+.task-primary-actions.untimed-actions { grid-template-columns: auto 1fr; }
 .task-more-toggle { justify-self: end; justify-content: flex-end; border-color: transparent; color: var(--muted); font-size: 14px; gap: 6px; }
 .secondary-actions { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
 .secondary-actions button { font-size: 14px; background: transparent; color: var(--muted); border-color: var(--border); }

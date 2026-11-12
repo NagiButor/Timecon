@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const STORAGE_KEY: &str = "timecon.v1";
-pub const BUILD: &str = "v32 · Rust";
+pub const BUILD: &str = "v33 · Rust";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -44,6 +44,7 @@ pub struct Task {
     pub id: String,
     pub title: String,
     pub minutes: u32,
+    pub no_timer: bool,
     #[serde(deserialize_with = "nullable_string")]
     pub cat_id: String,
     pub status: Status,
@@ -59,6 +60,7 @@ impl Default for Task {
             id: String::new(),
             title: String::new(),
             minutes: 25,
+            no_timer: false,
             cat_id: String::new(),
             status: Status::Pending,
             start_at: None,
@@ -67,6 +69,11 @@ impl Default for Task {
             auto_done: false,
             manual: false,
         }
+    }
+}
+impl Task {
+    pub fn timed_minutes(&self) -> u32 {
+        if self.no_timer { 0 } else { self.minutes }
     }
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -270,7 +277,10 @@ impl State {
         if self.running.iter().any(|r| r.task_id == id) {
             return false;
         }
-        let Some(task) = self.task_mut(id).filter(|t| t.status == Status::Pending) else {
+        let Some(task) = self
+            .task_mut(id)
+            .filter(|t| t.status == Status::Pending && !t.no_timer)
+        else {
             return false;
         };
         task.status = Status::Running;
@@ -302,7 +312,7 @@ impl State {
         if let Some(t) = self.task_mut(id).filter(|t| t.status == Status::Pending) {
             t.status = Status::Done;
             t.started_at = None;
-            t.manual = true;
+            t.manual = !t.no_timer;
             t.updated_at = now;
         }
     }
@@ -362,7 +372,18 @@ impl State {
             .values_mut()
             .flatten()
             .chain(self.backlog.iter_mut())
+            .chain(self.presets.values_mut().flatten())
         {
+            if task.no_timer {
+                task.minutes = 0;
+                task.start_at = None;
+                task.started_at = None;
+                task.auto_done = false;
+                task.manual = false;
+                if matches!(task.status, Status::Running | Status::Ask) {
+                    task.status = Status::Pending;
+                }
+            }
             if task.status == Status::Running && !ids.contains(&task.id) {
                 task.status = Status::Pending;
                 task.started_at = None;
@@ -462,7 +483,11 @@ impl State {
                     "task".into(),
                     day.clone(),
                     t.title.clone(),
-                    t.minutes.to_string(),
+                    if t.no_timer {
+                        String::new()
+                    } else {
+                        t.minutes.to_string()
+                    },
                     self.category_label(&t.cat_id, false),
                     t.status.as_str().into(),
                 ]);
@@ -644,6 +669,54 @@ mod tests {
         assert_eq!(s.expire(1_500_010).len(), 2);
         assert!(s.running.is_empty());
         assert_eq!(s.task("a").unwrap().status, Status::Ask);
+    }
+    #[test]
+    fn plain_tasks_complete_move_and_sync_without_timers() {
+        let mut local = State::default();
+        local.add_task(
+            "2026-11-10",
+            Task {
+                no_timer: true,
+                minutes: 0,
+                ..task("a", 1)
+            },
+        );
+        assert!(!local.start_task("a", 2));
+        assert!(local.running.is_empty());
+        local.move_task("a", None, 3);
+        let mut remote = State::from_json(&serde_json::to_string(&local).unwrap()).unwrap();
+        let moved = remote.backlog.remove(0);
+        assert!(moved.no_timer);
+        remote.add_task("2026-11-11", moved);
+        remote.finish_now("a", 4);
+        let merged = local.merge(&remote);
+        let done = merged.task("a").unwrap();
+        assert_eq!(done.status, Status::Done);
+        assert!(done.no_timer);
+        assert_eq!(done.timed_minutes(), 0);
+        assert!(!done.manual);
+        assert!(done.started_at.is_none());
+        assert!(merged.running.is_empty());
+        assert!(merged.backlog.is_empty());
+        assert!(merged.csv().contains("\"test\",\"\""));
+    }
+    #[test]
+    fn imports_preserve_legacy_timers_and_clear_plain_task_timer_state() {
+        let state = State::from_json(
+            r#"{"days":{"2026-11-10":[{"id":"legacy","minutes":45},{"id":"plain","noTimer":true,"minutes":30,"startAt":"12:00","startedAt":1,"status":"running"}]},"running":[{"taskId":"plain","startedAt":1,"endAt":999999}],"presets":{"1":[{"noTimer":true,"minutes":25,"startAt":"12:00"}]},"backlog":[{"noTimer":true,"status":"ask"}]}"#,
+        )
+        .unwrap();
+        assert!(!state.task("legacy").unwrap().no_timer);
+        assert_eq!(state.task("legacy").unwrap().minutes, 45);
+        let plain = state.task("plain").unwrap();
+        assert_eq!(plain.status, Status::Pending);
+        assert_eq!(plain.minutes, 0);
+        assert!(plain.start_at.is_none());
+        assert!(plain.started_at.is_none());
+        assert!(state.running.is_empty());
+        assert!(state.presets["1"][0].no_timer);
+        assert!(state.presets["1"][0].start_at.is_none());
+        assert_eq!(state.backlog[0].status, Status::Pending);
     }
     #[test]
     fn cancellation_sets_cooldown() {

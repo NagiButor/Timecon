@@ -76,7 +76,7 @@ fn build() {
         }
     }
     hash_assets(Path::new("public"), &mut hash);
-    let version = format!("v32-{hash:016x}");
+    let version = format!("v33-{hash:016x}");
     // The only authored JS is an ABI bootloader: both UI and service-worker logic run in Rust.
     fs::write("dist/boot.js", format!("import init from './pkg/timecon.js';\ninit().catch(error => {{ document.getElementById('main').textContent = 'Timecon failed to start: ' + error; console.error(error); }});\n// {version}\n")).unwrap();
     let mut assets = vec!["./".to_string()];

@@ -177,10 +177,13 @@ impl Ctx<'_> {
         html! {
             li class=(format!("task {} {}",t.status.as_str(),if focused{"focused"}else{""})) data-task-id=(&t.id) data-status=(t.status.as_str()) style=(format!("--c:{}",safe_color(color))) {
                 div class="task-head" { span class="cat-ico"{(icon(cat.map(|c|c.icon.as_str()).unwrap_or("star")))}
-                    div class="task-title" {span class="ttl"{(&t.title)} small { (t.minutes) " " (self.t("min"))
-                        @if let Some(at)=&t.start_at {" · " (self.t("auto_at")) " " (at)}
-                        @if let Some(ts)=t.started_at {" · " (self.t("started_at")) " " (local_time(ts))}
-                        @if t.manual && t.status==Status::Done {" · " (self.t("manual_mark"))}
+                    div class="task-title" {span class="ttl"{(&t.title)} small {
+                        @if t.no_timer {(self.t("no_timer"))} @else {
+                            (t.minutes) " " (self.t("min"))
+                            @if let Some(at)=&t.start_at {" · " (self.t("auto_at")) " " (at)}
+                            @if let Some(ts)=t.started_at {" · " (self.t("started_at")) " " (local_time(ts))}
+                            @if t.manual && t.status==Status::Done {" · " (self.t("manual_mark"))}
+                        }
                     }}
                     @if t.status==Status::Done || t.status==Status::Failed {span class=(if t.status==Status::Done{"mark ok"}else{"mark bad"}){(icon(if t.status==Status::Done{"check"}else{"x"}))}}
                     @if t.status==Status::Running {(self.button("focusTimer",&t.id,"focus_timer","clock","icon-btn ghost"))}
@@ -196,12 +199,13 @@ impl Ctx<'_> {
                         button class="bad" data-act="verdict" data-id=(&t.id) data-v="failed"{(icon("x")) (self.t("verdict_failed"))}
                     }},
                     Status::Pending => {
-                        div class="acts task-primary-actions" {
-                            (self.button("start",&t.id,"start","play","primary")) (self.button("finishNow",&t.id,"mark_done","check","ok"))
+                        div class=(if t.no_timer{"acts task-primary-actions untimed-actions"}else{"acts task-primary-actions"}) {
+                            @if !t.no_timer {(self.button("start",&t.id,"start","play","primary"))}
+                            (self.button("finishNow",&t.id,"mark_done","check","ok"))
                             button class="ghost task-more-toggle" data-act="taskMore" data-id=(&t.id) aria-expanded=(self.ui.actions_id==t.id){(self.t("more_actions")) " ⋯"}
                         }
                         @if self.ui.actions_id==t.id {div class="secondary-actions" {
-                            (self.button("time",&t.id,"auto_on","clock",""))
+                            @if !t.no_timer {(self.button("time",&t.id,"auto_on","clock",""))}
                             @if self.ui.sort=="manual" {
                                 button data-act="up" data-id=(&t.id) disabled[i==0]{(self.t("up"))}
                                 button data-act="down" data-id=(&t.id) disabled[i+1>=total]{(self.t("down"))}
@@ -217,7 +221,7 @@ impl Ctx<'_> {
                         input type="date" name="date" value=(add_days(&self.ui.day,1)); button class="primary"{(self.t("ok"))}
                     }
                 }
-                @if self.ui.time_id==t.id {form class="move" data-form="setTime" data-id=(&t.id){input type="time" name="time" value=(t.start_at.as_deref().unwrap_or("")); button class="primary"{(self.t("ok"))} (self.button("timeClear",&t.id,"auto_off","","ghost"))}}
+                @if self.ui.time_id==t.id && !t.no_timer {form class="move" data-form="setTime" data-id=(&t.id){input type="time" name="time" value=(t.start_at.as_deref().unwrap_or("")); button class="primary"{(self.t("ok"))} (self.button("timeClear",&t.id,"auto_off","","ghost"))}}
             }
         }
     }
@@ -238,7 +242,7 @@ impl Ctx<'_> {
                 Status::Done => 3,
                 Status::Failed => 4,
             }),
-            "time" => list.sort_by_key(|t| std::cmp::Reverse(t.minutes)),
+            "time" => list.sort_by_key(|t| std::cmp::Reverse(t.timed_minutes())),
             _ => {}
         }
         let active: Vec<_> = list
@@ -257,11 +261,12 @@ impl Ctx<'_> {
             .or(active.first())
             .map(|t| t.id.as_str())
             .unwrap_or("");
+        let planned_minutes: u32 = list.iter().map(|t| t.timed_minutes()).sum();
         html! {
             section class="day-hero"{div class="day-heading"{div{p class="eyebrow"{(weekday(&self.s.lang,&self.ui.day)) " · " (&self.ui.day)} h2{(if self.ui.day==self.ui.today{self.t("today")}else{self.ui.day.clone()})}}
                 div class="day-arrows"{@for (n,k,ic) in [(-1,"previous_day","left"),(1,"next_day","right")]{button class="icon-btn ghost" data-act="day" data-n=(n) aria-label=(self.t(k)){(icon(ic))}}}
             }
-            @if !list.is_empty(){p class="day-summary"{b{(list.iter().filter(|t|t.status==Status::Done).count())} " " (self.t("of")) " " (list.len()) " " (self.t("tasks_done")) span{"·"} (duration(list.iter().map(|t|t.minutes).sum(),&self.s.lang)) " " (self.t("planned"))}}
+            @if !list.is_empty(){p class="day-summary"{b{(list.iter().filter(|t|t.status==Status::Done).count())} " " (self.t("of")) " " (list.len()) " " (self.t("tasks_done")) @if planned_minutes>0 {span{"·"} (duration(planned_minutes,&self.s.lang)) " " (self.t("planned"))}}}
             }
             @if !active.is_empty(){div class="section-label"{span class="live-dot"{} (self.t("focus")) small{(active.len())}} ul class="tasks focus-list"{@for t in active {(self.task(t,list.iter().position(|v|v.id==t.id).unwrap_or(0),list.len(),focus==t.id))}}}
             @if !rest.is_empty(){div class="toolbar plan-toolbar"{h3{(self.t("day_plan"))} label{span class="sr-only"{(self.t("sort"))} select data-change="sort" aria-label=(self.t("sort")){@for (v,k) in [("manual","sort_manual"),("cat","sort_cat"),("status","sort_status"),("time","sort_time")]{option value=(v) selected[self.ui.sort==v]{(self.t(k))}}}}}
@@ -274,7 +279,7 @@ impl Ctx<'_> {
                         div class="preset"{div class="preset-head"{b{(TEXT[&self.s.lang]["wd"][wd].as_str().unwrap_or(""))}
                             button class="ghost" data-act="applyPreset" data-wd=(wd){(self.t("apply_preset"))}
                             button class="icon-btn" data-act="clearPreset" data-wd=(wd) aria-label=(self.t("clear_preset")){(icon("trash"))}}
-                            ul class="mini"{@for p in tasks{li{(icon("clock")) span{(&p.title)} small{(p.minutes) " " (self.t("min")) " " (p.start_at.as_deref().unwrap_or(""))}}}}
+                            ul class="mini"{@for p in tasks{li{(icon(if p.no_timer{"tasks"}else{"clock"})) span{(&p.title)} small{@if p.no_timer{(self.t("no_timer"))}@else{(p.minutes) " " (self.t("min")) " " (p.start_at.as_deref().unwrap_or(""))}}}}}
                         }
                     }}
                     @if self.s.presets.values().all(Vec::is_empty){p class="empty"{(self.t("presets_empty"))}}
@@ -321,7 +326,7 @@ impl Ctx<'_> {
         };
         let mut by_task = BTreeMap::new();
         let mut by_cat = BTreeMap::new();
-        for t in &done {
+        for t in done.iter().filter(|t| !t.no_timer) {
             *by_task.entry(t.title.clone()).or_insert(0.0) += f64::from(t.minutes);
             *by_cat
                 .entry(self.s.category_label(&t.cat_id, false))
@@ -330,7 +335,7 @@ impl Ctx<'_> {
         html! {
             div class="periods"{@for (v,k) in [("day","period_day"),("week","period_week"),("month","period_month"),("all","period_all")]{button class=(if self.ui.period==v{"on"}else{""}) data-act="period" data-p=(v){(self.t(k))}}}
             section class="card"{div class="tiles"{
-                (self.tile("total_time",&duration(done.iter().map(|t|t.minutes).sum(),&self.s.lang),""))
+                (self.tile("total_time",&duration(done.iter().map(|t|t.timed_minutes()).sum(),&self.s.lang),""))
                 (self.tile("completion",&format!("{pct}%"),"")) (self.tile("done_count",&done.len().to_string(),"pos")) (self.tile("failed_count",&failed.to_string(),"neg"))
             }}
             section class="card"{h3{(self.t("by_task"))} (self.bars(by_task,false))}
@@ -391,7 +396,7 @@ impl Ctx<'_> {
         html! {
             div class="card daybar"{button class="icon-btn" data-act="month" data-n="-1" aria-label=(self.t("previous_month")){(icon("left"))} b{(&self.ui.month)} button class="icon-btn" data-act="month" data-n="1" aria-label=(self.t("next_month")){(icon("right"))}}
             section class="card balance-card"{p class="eyebrow"{(self.t("balance"))} b class=(if balance<0.0{"balance-value neg"}else{"balance-value"}){(money(balance,&self.s.currency))}
-                div class="balance-breakdown"{div{span{(self.t("income"))} b{(money(income,&self.s.currency))}} div{span{(self.t("expenses"))} b{(money(spent,&self.s.currency))}}}
+                div class="balance-breakdown"{div{span{(self.t("income"))} b class="pos"{(money(income,&self.s.currency))}} div{span{(self.t("expenses"))} b class="neg"{(money(spent,&self.s.currency))}}}
                 details class="finance-details" data-disclosure="finance"{summary{(self.t("details"))} div class="tiles"{
                     (self.tile("efficiency",&format!("{:.0}%",if income>0.0{balance/income*100.0}else{0.0}),""))
                     (self.tile("unneeded",&money(unneeded,&self.s.currency),"")) (self.tile("unneeded_share",&format!("{:.0}%",if spent>0.0{unneeded/spent*100.0}else{0.0}),""))
@@ -586,8 +591,16 @@ pub fn sheet(s: &State, ui: &Ui, kind: &str) -> String {
         form class="form sheet-form" data-form=(kind){
             @if task{
                 label{(c.t("task_title")) input name="title" required maxlength="80" autocomplete="off";}
-                div class="row2"{label{(c.t("minutes")) input name="minutes" type="number" min="1" max="600" value="25" required inputmode="numeric";} label{(c.t("category")) select name="cat"{(c.cat_options(false))}}}
-                details class="advanced"{summary{(c.t("more"))} label{(c.t("auto_start")) input name="startAt" type="time";} p class="muted hint"{(c.t("auto_hint"))}}
+                fieldset class="task-mode"{legend class="sr-only"{(c.t("task_mode"))}
+                    label{input type="radio" name="mode" value="plain" data-change="taskMode" checked; (icon("tasks")) (c.t("no_timer"))}
+                    label{input type="radio" name="mode" value="timed" data-change="taskMode"; (icon("clock")) (c.t("with_timer"))}
+                }
+                p class="muted hint"{(c.t("task_mode_hint"))}
+                label{(c.t("category")) select name="cat"{(c.cat_options(false))}}
+                fieldset class="form timer-fields" data-timer-fields hidden disabled{
+                    label{(c.t("minutes")) input name="minutes" type="number" min="1" max="600" value="25" required inputmode="numeric";}
+                    details class="advanced"{summary{(c.t("more"))} label{(c.t("auto_start")) input name="startAt" type="time";} p class="muted hint"{(c.t("auto_hint"))}}
+                }
             } @else {
                 div class="row2"{label{(c.t("amount")) input name="amount" type="number" step="0.01" min="0.01" required inputmode="decimal";} label{(c.t("date")) input name="date" type="date" value=(&ui.today) required;}}
                 @if expense{div class="row2"{label{(c.t("cat_fin")) select name="catId"{(c.cat_options(true))}} label class="check"{input name="needed" type="checkbox" checked; (c.t("needed"))}}}
@@ -627,6 +640,48 @@ mod tests {
     #[test]
     fn styles_cannot_be_injected() {
         assert_eq!(safe_color("red;position:fixed"), "#d4af37");
+    }
+    #[test]
+    fn plain_tasks_have_no_timer_controls_or_invented_time_in_stats() {
+        let mut s = State::default();
+        s.add_task(
+            "2026-11-10",
+            Task {
+                id: "plain".into(),
+                title: "Купить продукты".into(),
+                no_timer: true,
+                // Ignore a stale duration even before imported data is normalized.
+                minutes: 90,
+                ..Default::default()
+            },
+        );
+        let mut ui = Ui::new("2026-11-10".into());
+        ui.actions_id = "plain".into();
+        ui.time_id = "plain".into();
+        let h = main(&s, &ui, 0, &SyncView::default());
+        assert!(h.contains("Без таймера"));
+        assert!(h.contains("data-act=\"finishNow\""));
+        assert!(!h.contains("data-act=\"start\""));
+        assert!(!h.contains("data-act=\"time\""));
+        assert!(!h.contains("data-form=\"setTime\""));
+        assert!(!h.contains("по плану"));
+        s.finish_now("plain", 1);
+        s.add_task(
+            "2026-11-10",
+            Task {
+                id: "timed".into(),
+                title: "Чтение".into(),
+                minutes: 25,
+                status: Status::Done,
+                ..Default::default()
+            },
+        );
+        ui.view = "stats".into();
+        let stats = main(&s, &ui, 1, &SyncView::default());
+        assert!(stats.contains("25 мин"));
+        assert!(stats.contains("Выполнено</small><b class=\"pos\">2</b>"));
+        assert!(!stats.contains("Купить продукты"));
+        assert!(stats.contains("Чтение"));
     }
     #[test]
     fn google_sign_in_has_branded_logo_in_both_languages_and_themes() {

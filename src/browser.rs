@@ -801,21 +801,31 @@ fn submit(e: Event) {
                 if title.is_empty() {
                     return false;
                 }
+                let no_timer = fd(&f, "mode") != "timed";
                 s.add_task(
                     &u.day,
                     Task {
                         id: uid(),
                         title,
-                        minutes: fd(&f, "minutes").parse::<u32>().unwrap_or(25).clamp(1, 600),
+                        minutes: if no_timer {
+                            0
+                        } else {
+                            fd(&f, "minutes").parse::<u32>().unwrap_or(25).clamp(1, 600)
+                        },
+                        no_timer,
                         cat_id: fd(&f, "cat"),
-                        start_at: valid_time(&fd(&f, "startAt")),
+                        start_at: if no_timer {
+                            None
+                        } else {
+                            valid_time(&fd(&f, "startAt"))
+                        },
                         updated_at: at,
                         ..Default::default()
                     },
                 );
             }
             "setTime" => {
-                if let Some(t) = s.task_mut(&data(&form, "id")) {
+                if let Some(t) = s.task_mut(&data(&form, "id")).filter(|t| !t.no_timer) {
                     t.start_at = valid_time(&fd(&f, "time"));
                     t.auto_done = false;
                     t.updated_at = at;
@@ -983,6 +993,22 @@ fn change(e: Event) {
     };
     let kind = data(&el, "change");
     match kind.as_str() {
+        "taskMode" => {
+            if let Some(fields) = el
+                .closest("form")
+                .ok()
+                .flatten()
+                .and_then(|form| form.query_selector("[data-timer-fields]").ok().flatten())
+            {
+                if value(&el) == "timed" {
+                    let _ = fields.remove_attribute("hidden");
+                    let _ = fields.remove_attribute("disabled");
+                } else {
+                    let _ = fields.set_attribute("hidden", "");
+                    let _ = fields.set_attribute("disabled", "");
+                }
+            }
+        }
         "sort" => {
             with_app(|a| a.ui.sort = value(&el));
             render(false)
@@ -1174,7 +1200,7 @@ fn tick() {
                 .get(&current)
                 .into_iter()
                 .flatten()
-                .filter(|t| t.status == Status::Pending && !t.auto_done)
+                .filter(|t| t.status == Status::Pending && !t.no_timer && !t.auto_done)
                 .filter_map(|t| {
                     let time = t.start_at.as_ref()?;
                     valid_time(time)?;
