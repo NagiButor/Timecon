@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const STORAGE_KEY: &str = "timecon.v1";
-pub const BUILD: &str = "v33 · Rust";
+pub const BUILD: &str = "v34 · Rust";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -45,6 +45,7 @@ pub struct Task {
     pub title: String,
     pub minutes: u32,
     pub no_timer: bool,
+    pub repeat_id: String,
     #[serde(deserialize_with = "nullable_string")]
     pub cat_id: String,
     pub status: Status,
@@ -61,6 +62,7 @@ impl Default for Task {
             title: String::new(),
             minutes: 25,
             no_timer: false,
+            repeat_id: String::new(),
             cat_id: String::new(),
             status: Status::Pending,
             start_at: None,
@@ -74,6 +76,20 @@ impl Default for Task {
 impl Task {
     pub fn timed_minutes(&self) -> u32 {
         if self.no_timer { 0 } else { self.minutes }
+    }
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DailyTask {
+    pub id: String,
+    pub start_day: String,
+    pub stopped_from: Option<String>,
+    pub updated_at: i64,
+    pub task: Task,
+}
+impl DailyTask {
+    pub fn includes(&self, day: &str) -> bool {
+        day >= self.start_day.as_str() && self.stopped_from.as_deref().is_none_or(|end| day < end)
     }
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -179,6 +195,7 @@ pub struct State {
     pub presets: BTreeMap<String, Vec<Task>>,
     pub days: BTreeMap<String, Vec<Task>>,
     pub backlog: Vec<Task>,
+    pub daily: Vec<DailyTask>,
     pub notes: Vec<Note>,
     pub running: Vec<Run>,
     pub fin: Finance,
@@ -213,6 +230,7 @@ impl Default for State {
             presets: BTreeMap::new(),
             days: BTreeMap::new(),
             backlog: vec![],
+            daily: vec![],
             notes: vec![],
             running: vec![],
             fin: Finance::default(),
@@ -272,6 +290,64 @@ impl State {
     }
     pub fn add_task(&mut self, day: &str, task: Task) {
         self.days.entry(day.into()).or_default().push(task);
+    }
+    pub fn add_daily_task(&mut self, day: &str, task: Task) {
+        self.daily.push(DailyTask {
+            id: task.id.clone(),
+            start_day: day.into(),
+            updated_at: task.updated_at,
+            task,
+            ..Default::default()
+        });
+        self.ensure_day(day);
+    }
+    pub fn ensure_day(&mut self, day: &str) -> bool {
+        if self.daily.is_empty() || NaiveDate::parse_from_str(day, "%Y-%m-%d").is_err() {
+            return false;
+        }
+        let existing: BTreeSet<_> = self
+            .days
+            .values()
+            .flatten()
+            .chain(self.backlog.iter())
+            .map(|task| task.id.as_str())
+            .collect();
+        let mut added = vec![];
+        for series in self.daily.iter().filter(|series| series.includes(day)) {
+            // Both devices generate the same occurrence, even while offline.
+            let id = format!("daily-{}-{day}", series.id);
+            if existing.contains(id.as_str()) || self.deleted.contains_key(&id) {
+                continue;
+            }
+            let mut task = series.task.clone();
+            task.id = id;
+            task.repeat_id = series.id.clone();
+            task.status = Status::Pending;
+            task.started_at = None;
+            task.updated_at = series.task.updated_at;
+            task.auto_done = false;
+            task.manual = false;
+            added.push(task);
+        }
+        let changed = !added.is_empty();
+        if changed {
+            self.days.entry(day.into()).or_default().extend(added);
+        }
+        changed
+    }
+    pub fn stop_daily_task(&mut self, id: &str, from: &str, now: i64) {
+        if let Some(series) = self.daily.iter_mut().find(|series| series.id == id) {
+            if series
+                .stopped_from
+                .as_deref()
+                .is_some_and(|end| end <= from)
+            {
+                return;
+            }
+            series.stopped_from = Some(from.into());
+            series.updated_at = now;
+            self.reconcile();
+        }
     }
     pub fn start_task(&mut self, id: &str, now: i64) -> bool {
         if self.running.iter().any(|r| r.task_id == id) {
@@ -366,6 +442,21 @@ impl State {
         }
     }
     pub fn reconcile(&mut self) {
+        // Remove only untouched future occurrences when a series is stopped.
+        // Completed days and running timers remain part of the history.
+        for list in self.days.values_mut() {
+            list.retain(|task| {
+                task.status != Status::Pending
+                    || !self.daily.iter().any(|series| {
+                        task.repeat_id == series.id
+                            && series.stopped_from.as_deref().is_some_and(|end| {
+                                task.id
+                                    .strip_prefix(&format!("daily-{}-", series.id))
+                                    .is_some_and(|day| day >= end)
+                            })
+                    })
+            });
+        }
         let ids: BTreeSet<_> = self.running.iter().map(|r| r.task_id.clone()).collect();
         for task in self
             .days
@@ -373,6 +464,7 @@ impl State {
             .flatten()
             .chain(self.backlog.iter_mut())
             .chain(self.presets.values_mut().flatten())
+            .chain(self.daily.iter_mut().map(|series| &mut series.task))
         {
             if task.no_timer {
                 task.minutes = 0;
@@ -465,6 +557,7 @@ impl State {
             |r| r.started_at,
         );
         out.auto_cooldown_until = self.auto_cooldown_until.max(remote.auto_cooldown_until);
+        out.daily = union(&self.daily, &remote.daily, |s| &s.id, |s| s.updated_at);
         out.reconcile();
         out
     }
@@ -717,6 +810,99 @@ mod tests {
         assert!(state.presets["1"][0].no_timer);
         assert!(state.presets["1"][0].start_at.is_none());
         assert_eq!(state.backlog[0].status, Status::Pending);
+    }
+    #[test]
+    fn daily_tasks_have_independent_days_and_survive_import() {
+        let mut state = State::default();
+        let mut daily = task("daily", 1);
+        daily.start_at = Some("08:00".into());
+        state.add_daily_task("2026-12-31", daily);
+        assert!(!state.ensure_day("2026-12-30"));
+        assert!(!state.ensure_day("2026-12-31"));
+        let first = state.days["2026-12-31"][0].id.clone();
+        state.start_task(&first, 2);
+        state.expire(1_500_002);
+        state.task_mut(&first).unwrap().status = Status::Done;
+        assert!(state.ensure_day("2027-01-01"));
+        let next = &state.days["2027-01-01"][0];
+        assert_eq!(next.status, Status::Pending);
+        assert_eq!(next.repeat_id, "daily");
+        assert_eq!(next.minutes, 25);
+        assert_eq!(next.start_at.as_deref(), Some("08:00"));
+        assert!(next.started_at.is_none());
+        assert!(!next.manual);
+        assert!(!next.auto_done);
+        assert_eq!(state.task(&first).unwrap().status, Status::Done);
+        let mut imported = State::from_json(&serde_json::to_string(&state).unwrap()).unwrap();
+        assert_eq!(state, imported);
+        assert!(imported.ensure_day("2030-06-01"));
+        assert_eq!(imported.days["2030-06-01"].len(), 1);
+    }
+    #[test]
+    fn daily_deletion_and_moves_do_not_recreate_occurrences() {
+        let mut state = State::default();
+        state.add_daily_task("2026-11-12", task("daily", 1));
+        let id = state.days["2026-11-12"][0].id.clone();
+        state.delete_task(&id, 2);
+        assert!(!state.ensure_day("2026-11-12"));
+        assert!(state.ensure_day("2026-11-13"));
+        let id = state.days["2026-11-13"][0].id.clone();
+        state.move_task(&id, None, 3);
+        assert!(!state.ensure_day("2026-11-13"));
+        assert_eq!(state.backlog.len(), 1);
+        let moved = state.backlog.remove(0);
+        state.add_task("2026-11-14", moved);
+        assert!(!state.ensure_day("2026-11-13"));
+        assert!(state.ensure_day("2026-11-14"));
+        assert_eq!(state.days["2026-11-14"].len(), 2);
+    }
+    #[test]
+    fn daily_offline_merge_deduplicates_and_keeps_completions() {
+        let mut local = State::default();
+        local.add_daily_task("2026-11-12", task("daily", 1));
+        let mut remote = local.clone();
+        local.ensure_day("2026-11-13");
+        remote.ensure_day("2026-11-13");
+        let id = remote.days["2026-11-13"][0].id.clone();
+        remote.finish_now(&id, 3);
+        let mut merged = local.merge(&remote);
+        assert_eq!(merged.daily.len(), 1);
+        assert_eq!(merged.days["2026-11-13"].len(), 1);
+        assert_eq!(merged.task(&id).unwrap().status, Status::Done);
+        assert!(!merged.ensure_day("2026-11-13"));
+    }
+    #[test]
+    fn stopping_daily_tasks_survives_stale_sync_and_preserves_history() {
+        let mut local = State::default();
+        local.add_daily_task("2026-11-12", task("daily", 1));
+        for day in ["2026-11-13", "2026-11-14", "2026-11-15"] {
+            local.ensure_day(day);
+        }
+        let completed = local.days["2026-11-12"][0].id.clone();
+        local.finish_now(&completed, 2);
+        let mut remote = local.clone();
+        remote.stop_daily_task("daily", "2026-11-13", 3);
+        for mut merged in [local.merge(&remote), remote.merge(&local)] {
+            assert_eq!(merged.task(&completed).unwrap().status, Status::Done);
+            assert!(merged.days["2026-11-13"].is_empty());
+            assert!(merged.days["2026-11-14"].is_empty());
+            assert!(!merged.ensure_day("2026-11-15"));
+            assert!(!merged.ensure_day("2027-01-01"));
+            assert!(!merged.ensure_day("2026-11-12"));
+        }
+    }
+    #[test]
+    fn stopping_does_not_make_new_copies_overwrite_completed_days() {
+        let mut local = State::default();
+        local.add_daily_task("2026-11-12", task("daily", 1));
+        let mut remote = local.clone();
+        local.ensure_day("2026-11-13");
+        let id = local.days["2026-11-13"][0].id.clone();
+        local.finish_now(&id, 2);
+        remote.stop_daily_task("daily", "2026-11-14", 3);
+        remote.ensure_day("2026-11-13");
+        assert_eq!(local.merge(&remote).task(&id).unwrap().status, Status::Done);
+        assert_eq!(remote.merge(&local).task(&id).unwrap().status, Status::Done);
     }
     #[test]
     fn cancellation_sets_cooldown() {

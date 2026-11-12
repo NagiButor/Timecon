@@ -157,6 +157,15 @@ fn field_key(e: &Element, i: usize) -> String {
     )
 }
 pub fn render(preserve: bool) {
+    let added = with_app(|a| {
+        let current = today();
+        let mut added = a.state.ensure_day(&current);
+        added |= a.state.ensure_day(&a.ui.day);
+        added
+    });
+    if added {
+        touch();
+    }
     let same = with_app(|a| RENDERED.with(|r| *r.borrow() == a.ui.view));
     let active = document().active_element();
     let fields: Vec<_> = if same && preserve {
@@ -498,6 +507,7 @@ fn click(e: Event) {
                         .flatten()
                         .chain(a.state.backlog.iter())
                         .chain(a.state.presets.values().flatten())
+                        .chain(a.state.daily.iter().map(|series| &series.task))
                         .any(|t| t.cat_id == id)
                 } else {
                     a.state.fin.expenses.iter().any(|e| e.cat_id == id)
@@ -572,6 +582,10 @@ fn click(e: Event) {
             }
             "cancel" => s.cancel_task(&id, at),
             "finishNow" => s.finish_now(&id, at),
+            "stopRepeat" => {
+                let from = add_days(std::cmp::max(u.day.as_str(), u.today.as_str()), 1);
+                s.stop_daily_task(&id, &from, at);
+            }
             "verdict" => {
                 if let Some(t) = s.task_mut(&id).filter(|t| t.status == Status::Ask) {
                     t.status = if data(&b, "v") == "done" {
@@ -618,13 +632,21 @@ fn click(e: Event) {
             "savePreset" => {
                 let wd = date(&u.day).weekday().num_days_from_sunday().to_string();
                 s.deleted.remove(&format!("preset-{wd}"));
-                s.presets
-                    .insert(wd, s.days.get(&u.day).cloned().unwrap_or_default());
+                let tasks = s
+                    .days
+                    .get(&u.day)
+                    .into_iter()
+                    .flatten()
+                    .filter(|task| task.repeat_id.is_empty())
+                    .cloned()
+                    .collect();
+                s.presets.insert(wd, tasks);
             }
             "applyPreset" => {
                 let wd = data(&b, "wd");
                 for mut task in s.presets.get(&wd).cloned().unwrap_or_default() {
                     task.id = uid();
+                    task.repeat_id.clear();
                     task.status = Status::Pending;
                     task.started_at = None;
                     task.updated_at = at;
@@ -802,27 +824,29 @@ fn submit(e: Event) {
                     return false;
                 }
                 let no_timer = fd(&f, "mode") != "timed";
-                s.add_task(
-                    &u.day,
-                    Task {
-                        id: uid(),
-                        title,
-                        minutes: if no_timer {
-                            0
-                        } else {
-                            fd(&f, "minutes").parse::<u32>().unwrap_or(25).clamp(1, 600)
-                        },
-                        no_timer,
-                        cat_id: fd(&f, "cat"),
-                        start_at: if no_timer {
-                            None
-                        } else {
-                            valid_time(&fd(&f, "startAt"))
-                        },
-                        updated_at: at,
-                        ..Default::default()
+                let task = Task {
+                    id: uid(),
+                    title,
+                    minutes: if no_timer {
+                        0
+                    } else {
+                        fd(&f, "minutes").parse::<u32>().unwrap_or(25).clamp(1, 600)
                     },
-                );
+                    no_timer,
+                    cat_id: fd(&f, "cat"),
+                    start_at: if no_timer {
+                        None
+                    } else {
+                        valid_time(&fd(&f, "startAt"))
+                    },
+                    updated_at: at,
+                    ..Default::default()
+                };
+                if fd(&f, "repeatDaily") == "on" {
+                    s.add_daily_task(&u.day, task);
+                } else {
+                    s.add_task(&u.day, task);
+                }
             }
             "setTime" => {
                 if let Some(t) = s.task_mut(&data(&form, "id")).filter(|t| !t.no_timer) {
@@ -1190,9 +1214,15 @@ fn tick() {
     let at = now();
     let current = today();
     let (titles, changed, intro) = with_app(|a| {
+        let followed_today = a.ui.day == a.ui.today;
+        let new_day = a.ui.today != current;
         a.ui.today = current.clone();
+        if new_day && followed_today {
+            a.ui.day = current.clone();
+        }
+        let added = a.state.ensure_day(&current);
         let titles = a.state.expire(at);
-        let mut changed = !titles.is_empty();
+        let mut changed = added || new_day || !titles.is_empty();
         if at >= a.state.auto_cooldown_until {
             let tasks: Vec<_> = a
                 .state

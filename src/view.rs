@@ -174,6 +174,11 @@ impl Ctx<'_> {
     fn task(&self, t: &Task, i: usize, total: usize, focused: bool) -> Markup {
         let cat = self.s.cats.iter().find(|c| c.id == t.cat_id);
         let color = cat.map(|c| c.color.as_str()).unwrap_or("#8b93a7");
+        let repeating = self
+            .s
+            .daily
+            .iter()
+            .any(|series| series.id == t.repeat_id && series.stopped_from.is_none());
         html! {
             li class=(format!("task {} {}",t.status.as_str(),if focused{"focused"}else{""})) data-task-id=(&t.id) data-status=(t.status.as_str()) style=(format!("--c:{}",safe_color(color))) {
                 div class="task-head" { span class="cat-ico"{(icon(cat.map(|c|c.icon.as_str()).unwrap_or("star")))}
@@ -184,6 +189,7 @@ impl Ctx<'_> {
                             @if let Some(ts)=t.started_at {" · " (self.t("started_at")) " " (local_time(ts))}
                             @if t.manual && t.status==Status::Done {" · " (self.t("manual_mark"))}
                         }
+                        @if !t.repeat_id.is_empty() {" · " (self.t("daily"))}
                     }}
                     @if t.status==Status::Done || t.status==Status::Failed {span class=(if t.status==Status::Done{"mark ok"}else{"mark bad"}){(icon(if t.status==Status::Done{"check"}else{"x"}))}}
                     @if t.status==Status::Running {(self.button("focusTimer",&t.id,"focus_timer","clock","icon-btn ghost"))}
@@ -210,10 +216,11 @@ impl Ctx<'_> {
                                 button data-act="up" data-id=(&t.id) disabled[i==0]{(self.t("up"))}
                                 button data-act="down" data-id=(&t.id) disabled[i+1>=total]{(self.t("down"))}
                             }
-                            (self.button("move",&t.id,"move","move","")) (self.button("del",&t.id,"delete","trash",""))
+                            (self.button("move",&t.id,"move","move","")) (self.button("del",&t.id,if t.repeat_id.is_empty(){"delete"}else{"delete_occurrence"},"trash",""))
+                            @if repeating {(self.button("stopRepeat",&t.repeat_id,"stop_repeat","",""))}
                         }}
                     },
-                    _ => {div class="acts"{(self.button("restore",&t.id,"restore","undo","ghost")) (self.button("del",&t.id,"delete","trash","ghost"))}}
+                    _ => {div class="acts"{(self.button("restore",&t.id,"restore","undo","ghost")) (self.button("del",&t.id,if t.repeat_id.is_empty(){"delete"}else{"delete_occurrence"},"trash","ghost")) @if repeating {(self.button("stopRepeat",&t.repeat_id,"stop_repeat","","ghost"))}}}
                 }
                 @if self.ui.move_id==t.id {
                     form class="move" data-form="move" data-id=(&t.id){
@@ -273,6 +280,11 @@ impl Ctx<'_> {
                 ul class="tasks"{@for t in rest{(self.task(t,list.iter().position(|v|v.id==t.id).unwrap_or(0),list.len(),false))}}
             } @else if list.is_empty(){section class="empty-day"{span class="empty-symbol"{(icon("tasks"))} h3{(self.t("empty_title"))} p{(self.t("empty_hint"))}}}
             div class="day-actions"{button class="primary add-task" data-act="openSheet" data-sheet="addTask"{(icon("plus")) (self.t("new_task"))} @if self.ui.day!=self.ui.today{(self.button("today","","today","","ghost"))}}
+            @let daily: Vec<_> = self.s.daily.iter().filter(|s| s.stopped_from.is_none()).collect();
+            @if !daily.is_empty() {details class="quiet-section" data-disclosure="daily"{summary{(self.t("daily_tasks")) span{(daily.len())}}
+                p class="muted hint"{(self.t("daily_hint"))}
+                ul class="mini"{@for series in daily {li{(icon("tasks")) span{(&series.task.title)} (self.button("stopRepeat",&series.id,"stop_repeat","","ghost"))}}}
+            }}
             details class="quiet-section" data-disclosure="presets"{summary{(self.t("presets")) span{(self.s.presets.values().filter(|v|!v.is_empty()).count())}}
                 section class="card"{h3{(self.t("presets"))}
                     @for wd in [1,2,3,4,5,6,0] {@if let Some(tasks)=self.s.presets.get(&wd.to_string()).filter(|v|!v.is_empty()){
@@ -597,6 +609,10 @@ pub fn sheet(s: &State, ui: &Ui, kind: &str) -> String {
                 }
                 p class="muted hint"{(c.t("task_mode_hint"))}
                 label{(c.t("category")) select name="cat"{(c.cat_options(false))}}
+                div class="repeat-option"{
+                    label class="check"{input type="checkbox" name="repeatDaily" aria-describedby="repeatHint"; (c.t("repeat_daily"))}
+                    p class="muted hint" id="repeatHint"{(c.t("repeat_daily_hint")) " " (&ui.day) "."}
+                }
                 fieldset class="form timer-fields" data-timer-fields hidden disabled{
                     label{(c.t("minutes")) input name="minutes" type="number" min="1" max="600" value="25" required inputmode="numeric";}
                     details class="advanced"{summary{(c.t("more"))} label{(c.t("auto_start")) input name="startAt" type="time";} p class="muted hint"{(c.t("auto_hint"))}}

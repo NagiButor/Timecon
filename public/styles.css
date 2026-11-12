@@ -395,6 +395,9 @@ details[open] > summary::after { content: '−'; }
 .task-mode input { width: auto; min-height: 0; margin: 0; flex: none; }
 .timer-fields { border: 0; padding: 0; margin: 0; min-width: 0; gap: 20px; }
 .timer-fields[hidden] { display: none; }
+.repeat-option { display: flex; flex-direction: column; gap: 6px; }
+.repeat-option .check { min-height: 44px; gap: 10px; cursor: pointer; }
+.repeat-option input { flex: none; min-height: 0; }
 .advanced { border-top: 1px solid var(--border); }
 .advanced .hint { margin-top: 12px; }
 body.sheet-open { position: fixed; width: 100%; overflow: hidden; }
